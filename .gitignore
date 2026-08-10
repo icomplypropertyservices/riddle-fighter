@@ -1,0 +1,13 @@
+node_modules
+dist
+.DS_Store
+*.local
+.env
+.env.*
+dev-dist
+
+.vercel
+.env*
+.next
+out
+*.log

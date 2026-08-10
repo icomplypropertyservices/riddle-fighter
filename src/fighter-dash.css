@@ -1,0 +1,311 @@
+/**
+ * FIGHTER DASH v2 — complete visual rebuild (not city / reborn).
+ * Solid colors only. Prefix: fd-
+ */
+
+:root {
+  --fd-bg: #050508;
+  --fd-panel: #0e0e16;
+  --fd-edge: #2a2540;
+  --fd-cyan: #22d3ee;
+  --fd-pink: #f472b6;
+  --fd-violet: #a78bfa;
+  --fd-gold: #fbbf24;
+  --fd-green: #34d399;
+  --fd-red: #f87171;
+  --fd-text: #f8fafc;
+  --fd-mute: #94a3b8;
+}
+
+/* Force fighter shell background */
+.app.has-suite-chrome {
+  background: var(--fd-bg) !important;
+  max-width: min(1100px, 100%);
+}
+
+/* —— HERO —— */
+.fd-hero {
+  position: relative;
+  border-radius: 18px;
+  border: 2px solid var(--fd-edge);
+  background: var(--fd-panel);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.fd-hero-glow {
+  position: absolute;
+  inset: 0;
+  background: #22d3ee14;
+  pointer-events: none;
+}
+.fd-hero-inner {
+  position: relative;
+  z-index: 1;
+  padding: 18px 16px 16px;
+}
+.fd-hero-row1 {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.fd-badge {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #1e1b2e;
+  border: 1px solid var(--fd-edge);
+  color: var(--fd-violet);
+}
+.fd-badge-live {
+  background: #052e1a;
+  border-color: #065f46;
+  color: var(--fd-green);
+}
+.fd-title {
+  margin: 0;
+  font-size: clamp(1.85rem, 7vw, 2.75rem);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  color: var(--fd-text);
+}
+.fd-title-x {
+  margin: 0 0.2em;
+  color: var(--fd-gold);
+}
+.fd-title-accent {
+  color: var(--fd-cyan);
+  text-shadow: 0 0 28px #22d3ee55;
+}
+.fd-sub {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--fd-mute);
+  font-weight: 600;
+}
+.fd-selected {
+  margin: 10px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fd-pink);
+}
+.fd-selected.muted {
+  color: var(--fd-mute);
+}
+.fd-selected strong {
+  color: var(--fd-text);
+}
+.fd-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+.fd-stat {
+  background: #08080f;
+  border: 1px solid var(--fd-edge);
+  border-radius: 12px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.fd-stat span {
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--fd-mute);
+  margin-bottom: 4px;
+}
+.fd-stat b {
+  font-size: 16px;
+  color: var(--fd-text);
+}
+.fd-stat b i {
+  font-style: normal;
+}
+.fd-stat b i.w {
+  color: var(--fd-green);
+}
+.fd-stat b i.l {
+  color: var(--fd-red);
+}
+.fd-stat b em {
+  font-style: normal;
+  margin: 0 3px;
+  color: var(--fd-mute);
+}
+.fd-stat b.hot {
+  color: var(--fd-gold);
+}
+
+/* —— MODES —— */
+.fd-modes {
+  background: var(--fd-panel);
+  border: 2px solid var(--fd-edge);
+  border-radius: 16px;
+  padding: 12px;
+}
+.fd-modes-label {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: var(--fd-mute);
+  margin-bottom: 10px;
+}
+.fd-modes-row {
+  display: grid;
+  /* Mobile-first: 2 mode cards on phones */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+@media (min-width: 768px) {
+  .fd-modes-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+@media (min-width: 1024px) {
+  .fd-modes-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.fd-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 6px;
+  border-radius: 12px;
+  border: 2px solid #1f1f2e;
+  background: #08080f;
+  color: var(--fd-mute);
+  cursor: pointer;
+  min-height: 78px;
+  min-width: 0;
+  max-width: 100%;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.fd-mode.is-on {
+  border-color: var(--fd-cyan);
+  background: #0a1a22;
+  color: var(--fd-text);
+  box-shadow: 0 0 0 1px #22d3ee44;
+}
+.fd-mode-ico {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--fd-gold);
+}
+.fd-mode-t {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+.fd-mode-s {
+  font-size: 9px;
+  opacity: 0.8;
+}
+.fd-mode-price {
+  margin-top: 2px;
+  min-height: 20px;
+  min-width: 44px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #12121c;
+  border: 1px solid #2a2a3e;
+  color: #fbbf24;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+.fd-mode.is-on .fd-mode-price {
+  border-color: #22d3ee55;
+  background: #0c1820;
+}
+
+/* —— VS bar punch up —— */
+.g-vs {
+  border-color: var(--fd-cyan) !important;
+  background: #070b12 !important;
+  border-width: 2px !important;
+}
+.g-vs-fight.is-ready {
+  background: #0891b2 !important;
+  border-color: var(--fd-cyan) !important;
+  font-size: 16px !important;
+  min-height: 52px !important;
+  letter-spacing: 0.16em !important;
+}
+
+/* —— Fighter picker cards punch —— */
+.g-pick {
+  border: 2px solid var(--fd-edge) !important;
+  background: var(--fd-panel) !important;
+  border-radius: 16px !important;
+}
+.g-pick-card.is-on {
+  border-color: var(--fd-pink) !important;
+  box-shadow: 0 0 0 2px #f472b644 !important;
+}
+.g-pick-art {
+  /* Heights owned by game-ui mobile-first breakpoints */
+  background-color: #1a1030 !important;
+  background-position: center top !important;
+  image-rendering: auto !important;
+}
+.g-pick-art img {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 1 !important;
+}
+.g-pick-detail-art {
+  width: 140px !important;
+  height: 140px !important;
+  image-rendering: auto !important;
+}
+.g-panel-title {
+  color: var(--fd-cyan) !important;
+  font-size: 1.15rem !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase;
+}
+
+/* Version stripe so rebuild is obvious */
+.fd-build-tag {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--fd-gold);
+  background: #1a1408;
+  border: 1px solid #854d0e;
+  border-radius: 8px;
+  padding: 8px;
+  margin: 0 0 8px;
+}
+
+/* Lobby panels: stacked cards first; lands rail after fighters on phones */
+.g-lobby-split > *:last-child {
+  order: 2;
+}
+@media (min-width: 768px) {
+  .g-lobby-split > *:last-child {
+    order: 0;
+  }
+}
+
+/* Compact mode labels on narrow phones */
+@media (max-width: 399px) {
+  .fd-mode-t {
+    font-size: 10px;
+  }
+  .fd-mode-s {
+    font-size: 8px;
+  }
+}

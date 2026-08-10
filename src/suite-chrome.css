@@ -1,0 +1,4 @@
+/**
+ * Thin re-export — suite chrome CSS SSOT in @riddle/suite-chrome.
+ */
+@import '@riddle/suite-chrome/css';

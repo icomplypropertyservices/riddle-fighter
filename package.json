@@ -1,0 +1,30 @@
+{
+    "name":  "riddle-fighter",
+    "private":  true,
+    "version":  "1.8.0",
+    "type":  "module",
+    "description":  "Riddle Fighter dashboard Ã¢â‚¬â€ HD NFT arena (not city/reborn). fighter.riddlewallet.com",
+    "scripts":  {
+                    "dev":  "vite",
+                    "build":  "tsc --noEmit \u0026\u0026 vite build",
+                    "preview":  "vite preview",
+                    "typecheck":  "tsc --noEmit"
+                },
+    "dependencies":  {
+                         "@riddle/suite-chrome":  "file:packages/suite-chrome",
+                         "@riddle/suite-credits":  "file:packages/suite-credits",
+                         "peerjs":  "^1.5.4",
+                         "react":  "^19.1.0",
+                         "react-dom":  "^19.1.0"
+                     },
+    "devDependencies":  {
+                            "@types/node":  "^26.1.2",
+                            "@types/react":  "^19.1.8",
+                            "@types/react-dom":  "^19.1.6",
+                            "@vitejs/plugin-react":  "^4.5.2",
+                            "playwright":  "^1.49.1",
+                            "typescript":  "~5.8.3",
+                            "vite":  "^6.3.5",
+                            "vite-plugin-pwa":  "^1.0.0"
+                        }
+}

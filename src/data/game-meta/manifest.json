@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "base": "https://meta.riddlewallet.com/game-meta",
+  "collections": {
+    "theinquisition": {
+      "role": "fighter",
+      "taxon": 2,
+      "file": "theinquisition.traits.json",
+      "bytes": 13238
+    },
+    "the-inquisition-reborn": {
+      "role": "fighter",
+      "taxon": 1003,
+      "file": "the-inquisition-reborn.traits.json",
+      "bytes": 14705
+    },
+    "the-inquiry": {
+      "role": "army",
+      "taxon": null,
+      "file": "the-inquiry.traits.json",
+      "bytes": 14659
+    },
+    "the-lost-emporium": {
+      "role": "items",
+      "taxon": null,
+      "file": "the-lost-emporium.traits.json",
+      "bytes": 2785
+    },
+    "under-the-bridge-riddle": {
+      "role": "pfp",
+      "taxon": null,
+      "file": "under-the-bridge-riddle.traits.json",
+      "bytes": 1829
+    },
+    "dantesaurum": {
+      "role": "art",
+      "taxon": null,
+      "file": "dantesaurum.traits.json",
+      "bytes": 1679
+    },
+    "riddletank": {
+      "role": "ticket",
+      "taxon": null,
+      "file": "riddletank.traits.json",
+      "bytes": 1306
+    },
+    "riddle-community": {
+      "role": "community",
+      "taxon": null,
+      "file": "riddle-community.traits.json",
+      "bytes": 1931
+    },
+    "riddle-basic-human": {
+      "role": "human",
+      "taxon": null,
+      "file": "riddle-basic-human.traits.json",
+      "bytes": 2195
+    }
+  }
+}

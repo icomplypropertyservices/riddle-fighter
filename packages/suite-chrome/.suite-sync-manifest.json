@@ -1,0 +1,22 @@
+{
+  "version": "2.1.0",
+  "files": {
+    "package.json": "ef0e5a52ff9d88ac16a9b41e5ca8d424c88f061e2c2abddd1bf2b13b22dbe2e8",
+    "README.md": "d6cb19ee6675c6864403a473e1c0678122e27591c03b52a1493eb6ac8dac9137",
+    "src/consent.ts": "2f36b0cb8f0c6abf1d957b5da9ed37ee21c599d2b1024e1e46a820fd16c6ff5d",
+    "src/identity-guard.ts": "652bad9223c53ff53699ab15cb194f865c5b135cc6e95ea1f4628150aebab4ba",
+    "src/index.ts": "7d1d75219e1d5ad1eb9c9d6815d083dfbd40a031cdd30f9c73d6ffad9378c256",
+    "src/suite-chrome.css": "a0da415cd9669aa05d3ba27e5fd6d748796cc958695c1ed8ea735c778ea6024c",
+    "src/suite-shell-config.ts": "445e1286c7dc31a8041c67a08616bc213b828991c0495600bb00c44fb8c24448",
+    "src/SuiteAccountControl.tsx": "d1531ffe8a3751f32ab5c2d1de45c876028c1920f1ae6a795ba0ebad2f844222",
+    "src/SuiteAnalytics.tsx": "acee6939926903d6432d571bb76885adb0451406f2930caebf8334531c63a33e",
+    "src/SuiteBottomNav.tsx": "92f0974426f8e6b1772ccd6838de87bb76e04507db44381644aec252f891a1da",
+    "src/SuiteConsentBanner.tsx": "2e1c67488207c066b525e6a4708f6a19f6bedbb0a651f386aa626322b5410760",
+    "src/suiteHandle.ts": "9707879f03a6b209ce0a9a5fee3c0c10a7bbd15a2de4f32eeafc5917bcc0e53f",
+    "src/suiteSession.ts": "8e7d1ad686d85d60f5edc749be6fcd5f181194394f61a0729ad19d01db213d3c",
+    "src/SuiteSocialRail.tsx": "88cd568aeee74b20c23780af155a7117165722dfa8c07431df5463c5a66b31f7",
+    "src/UnifiedSuiteFooter.tsx": "b06c8d38ec0dfb3384217e3a7d3ade5c60684368665169bf8394fba8a9ed411f",
+    "src/UnifiedSuiteHeader.tsx": "8a348aa796f398cf112e1fe4273fad96aacc7e5a25a1d1a9878bcdc0f666fac0",
+    "tsconfig.json": "69e056310d1d4efd57167bffb0fe18949fd84a2f0931013f6fa3da7526e79116"
+  }
+}
