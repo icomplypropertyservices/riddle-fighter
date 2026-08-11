@@ -402,6 +402,89 @@ await checkAsync('matchId preferred: battleId collision does not double when mat
   assert.equal(b.progress.xp, 50)
 })
 
+console.log('\nG10 /api/fighter action:settle (ledger only, no XP)')
+
+await checkAsync('settle does not award XP or bump W-L', async () => {
+  const nftId = 'nft_settle_no_xp'
+  const settled = await postMatch({
+    action: 'settle',
+    id: 'ws_settle_1',
+    nftId,
+    won: true,
+    stakeCredits: 20,
+    entryCredits: 10,
+    potCredits: 40,
+    payoutCredits: 36,
+    kind: 'mixed',
+    mode: 'cpu',
+  })
+  assert.equal(settled.ok, true)
+  assert.equal(settled.progress.xp, 0, 'settle must not grant XP')
+  assert.equal(settled.progress.wins, 0, 'settle must not bump wins')
+  assert.equal(settled.progress.losses, 0, 'settle must not bump losses')
+  assert.ok(settled.settle)
+  assert.equal(settled.settle.id, 'ws_settle_1')
+})
+
+await checkAsync('settle after match does not clobber XP', async () => {
+  const nftId = 'nft_settle_after'
+  const matchId = 'm_then_settle'
+  const matched = await postMatch({
+    action: 'match',
+    nftId,
+    matchId,
+    won: true,
+    combo: 0,
+    wagerCredits: 0,
+  })
+  assert.equal(matched.xpGained, 50)
+  assert.equal(matched.progress.xp, 50)
+  assert.equal(matched.progress.wins, 1)
+
+  const settled = await postMatch({
+    action: 'settle',
+    id: `ws_${matchId}`,
+    nftId,
+    battleId: matchId,
+    won: true,
+    stakeCredits: 10,
+    entryCredits: 5,
+    payoutCredits: 18,
+    kind: 'mixed',
+  })
+  assert.equal(settled.ok, true)
+  assert.equal(settled.progress.xp, 50, 'settle must not wipe match XP')
+  assert.equal(settled.progress.wins, 1, 'settle must not wipe wins')
+  assert.equal(
+    settled.progress.meta?.lastPayoutCredits,
+    18,
+    'settle may patch wager meta only',
+  )
+})
+
+await checkAsync('settle then match still awards XP once', async () => {
+  const nftId = 'nft_settle_then_match'
+  const matchId = 'm_settle_first'
+  await postMatch({
+    action: 'settle',
+    id: `ws_${matchId}`,
+    nftId,
+    won: true,
+    stakeCredits: 5,
+    payoutCredits: 9,
+  })
+  const matched = await postMatch({
+    action: 'match',
+    nftId,
+    matchId,
+    won: true,
+  })
+  assert.equal(matched.alreadySettled, false)
+  assert.equal(matched.xpGained, 50)
+  assert.equal(matched.progress.xp, 50)
+  assert.equal(matched.progress.wins, 1)
+})
+
 if (failed) {
   console.error(`\n${failed} test(s) failed`)
   process.exit(1)
