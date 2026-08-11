@@ -3,6 +3,6 @@
   "service": "riddle-fighter",
   "version": "1.8.0",
   "app": "fighter-nintendo-feel",
-  "rebuild": "2026-08-12-g10-settlement",
-  "note": "G10 single-path settlement: match claim-first XP, settleMatch once, no double XP; Nintendo feel retained"
+  "rebuild": "2026-08-12-g10-settle-durability",
+  "note": "G10 single-path: matchSettlement + fighterProgress + wagerLedger committed; claim-first XP once; no double XP"
 }
