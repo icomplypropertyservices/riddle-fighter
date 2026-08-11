@@ -9,6 +9,69 @@ import pg from 'pg'
 
 const mem = new Map()
 
+/** In-memory match claim set (G10). Keyed by matchId — first claim wins XP. */
+function matchClaimSet() {
+  if (!mem.has('__match_ids')) mem.set('__match_ids', new Set())
+  return mem.get('__match_ids')
+}
+
+/**
+ * Test helper: wipe in-memory progress + match claims.
+ * Only for unit/assert scripts — not used in production handlers.
+ */
+export function _resetMemForTests() {
+  mem.clear()
+}
+
+/**
+ * Resolve stable match key for claim-first idempotency.
+ * Prefers explicit matchId, then battleId (G10). Random only when neither set.
+ */
+export function resolveMatchId(body = {}) {
+  const explicit = String(body.matchId || body.battleId || '').trim()
+  if (explicit) return explicit
+  return `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+/**
+ * Claim matchId first (atomic). Returns true only on first claim.
+ * Neon: INSERT … ON CONFLICT DO NOTHING RETURNING id
+ * Memory: Set.add semantics
+ */
+export async function claimMatchFirst(client, matchId, logRow) {
+  const id = String(matchId || '').trim()
+  if (!id) return false
+  if (client) {
+    const ins = await client.query(
+      `INSERT INTO fighter_match_log
+        (id, nft_id, owner_address, won, opponent, mode, xp_gained, combo, wager_credits, entry_credits, payout_credits, battle_id, opponent_nft_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT (id) DO NOTHING
+       RETURNING id`,
+      [
+        id,
+        logRow.nftId,
+        logRow.ownerAddress || null,
+        Boolean(logRow.won),
+        logRow.opponent || null,
+        logRow.mode || 'cpu',
+        Math.max(0, Math.floor(Number(logRow.xpGained) || 0)),
+        logRow.combo ?? null,
+        Math.max(0, Math.floor(Number(logRow.wagerCredits) || 0)),
+        Math.max(0, Math.floor(Number(logRow.entryCredits) || 0)),
+        Math.max(0, Math.floor(Number(logRow.payoutCredits) || 0)),
+        logRow.battleId || null,
+        logRow.opponentNftId || null,
+      ],
+    )
+    return (ins.rowCount || 0) > 0
+  }
+  const ids = matchClaimSet()
+  if (ids.has(id)) return false
+  ids.add(id)
+  return true
+}
+
 function json(res, status, body) {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -389,55 +452,104 @@ export default async function handler(req, res) {
       const combo = Math.max(0, Math.floor(Number(body.combo) || 0))
       const wager = Math.max(0, Math.floor(Number(body.wagerCredits) || 0))
       const xpGain = xpForMatch(won, combo, wager)
-      // Prefer explicit matchId, then battleId (G10 stable key), else unique
-      const matchId = String(
-        body.matchId ||
-          body.battleId ||
-          `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-      ).trim()
-      const battleId = body.battleId || null
+      // G10: claim-first by stable matchId (matchId || battleId)
+      const matchId = resolveMatchId(body)
+      const battleId = body.battleId ? String(body.battleId).trim() : null
       const entryCr = Math.max(0, Math.floor(Number(body.entryCredits) || 0))
       const payoutCr = Math.max(0, Math.floor(Number(body.payoutCredits) || 0))
 
       const out = await withDb(async (client) => {
-        // G10: claim match log row FIRST — only first insert awards XP
-        let claimed = true
+        // Neon: claim + award in one transaction so failed awards release the claim
+        // (retry can succeed). Memory: claim-first Set (at-most-once).
         if (client) {
-          const ins = await client.query(
-            `INSERT INTO fighter_match_log
-              (id, nft_id, owner_address, won, opponent, mode, xp_gained, combo, wager_credits, entry_credits, payout_credits, battle_id, opponent_nft_id)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-             ON CONFLICT (id) DO NOTHING
-             RETURNING id`,
-            [
-              matchId,
+          await client.query('BEGIN')
+          try {
+            const claimed = await claimMatchFirst(client, matchId, {
               nftId,
-              body.ownerAddress || null,
+              ownerAddress: body.ownerAddress || null,
               won,
-              body.opponent || null,
-              body.mode || 'cpu',
-              xpGain,
+              opponent: body.opponent || null,
+              mode: body.mode || 'cpu',
+              xpGained: xpGain,
               combo,
-              wager,
-              entryCr,
-              payoutCr,
+              wagerCredits: wager,
+              entryCredits: entryCr,
+              payoutCredits: payoutCr,
               battleId,
-              body.opponentNftId || null,
-            ],
-          )
-          claimed = (ins.rowCount || 0) > 0
-        } else {
-          if (!mem.has('__match_ids')) mem.set('__match_ids', new Set())
-          const ids = mem.get('__match_ids')
-          if (ids.has(matchId)) {
-            claimed = false
-          } else {
-            ids.add(matchId)
+              opponentNftId: body.opponentNftId || null,
+            })
+            if (!claimed) {
+              await client.query('COMMIT')
+              const p = await getProgress(client, nftId)
+              return {
+                ok: true,
+                alreadySettled: true,
+                xpGained: 0,
+                progress: p,
+                metadata: buildUpgradeMetadata(p),
+                matchId,
+              }
+            }
+
+            let p = await getProgress(client, nftId)
+            p = {
+              ...p,
+              ownerAddress: body.ownerAddress || p.ownerAddress,
+              name: body.name || p.name,
+              image: body.image || p.image,
+              collection: body.collection || p.collection,
+              traits:
+                Array.isArray(body.traits) && body.traits.length ? body.traits : p.traits,
+              wins: p.wins + (won ? 1 : 0),
+              losses: p.losses + (won ? 0 : 1),
+              xp: p.xp + xpGain,
+            }
+            p.level = levelFromXp(p.xp)
+            p.meta = {
+              ...(p.meta || {}),
+              lastMatchAt: new Date().toISOString(),
+              lastOpponent: body.opponent || null,
+              lastMode: body.mode || null,
+              lastCombo: combo,
+              lastMatchId: matchId,
+            }
+            p = await upsertProgress(client, p)
+            await client.query('COMMIT')
+            return {
+              ok: true,
+              alreadySettled: false,
+              xpGained: xpGain,
+              progress: p,
+              metadata: buildUpgradeMetadata(p),
+              matchId,
+            }
+          } catch (err) {
+            try {
+              await client.query('ROLLBACK')
+            } catch {
+              /* soft */
+            }
+            throw err
           }
         }
 
+        // Memory / no DATABASE_URL — claim matchId first, then award once
+        const claimed = await claimMatchFirst(null, matchId, {
+          nftId,
+          ownerAddress: body.ownerAddress || null,
+          won,
+          opponent: body.opponent || null,
+          mode: body.mode || 'cpu',
+          xpGained: xpGain,
+          combo,
+          wagerCredits: wager,
+          entryCredits: entryCr,
+          payoutCredits: payoutCr,
+          battleId,
+          opponentNftId: body.opponentNftId || null,
+        })
         if (!claimed) {
-          const p = await getProgress(client, nftId)
+          const p = await getProgress(null, nftId)
           return {
             ok: true,
             alreadySettled: true,
@@ -448,7 +560,7 @@ export default async function handler(req, res) {
           }
         }
 
-        let p = await getProgress(client, nftId)
+        let p = await getProgress(null, nftId)
         p = {
           ...p,
           ownerAddress: body.ownerAddress || p.ownerAddress,
@@ -469,8 +581,7 @@ export default async function handler(req, res) {
           lastCombo: combo,
           lastMatchId: matchId,
         }
-        p = await upsertProgress(client, p)
-
+        p = await upsertProgress(null, p)
         return {
           ok: true,
           alreadySettled: false,
