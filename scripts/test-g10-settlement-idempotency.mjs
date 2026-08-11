@@ -37,9 +37,8 @@ globalThis.window = {
 }
 
 // Vite/TS sources are .ts — load via dynamic transpile is heavy.
-// Re-implement the claim contract here mirroring fighterProgress + matchSettlement
-// and also exercise exported pure helpers if we can import the built modules.
-// Prefer inline mirror of the contract + API match-id semantics.
+// Mirror production contracts from matchSettlement.ts + fighterProgress.ts
+// (makeMatchId / in-module consume set / local XP claim keys).
 
 function claimMatchXpKey(matchKey, cap = 200) {
   const key = String(matchKey || '').trim()
@@ -59,31 +58,34 @@ function claimMatchXpKey(matchKey, cap = 200) {
   return true
 }
 
-function buildSettlementKey(input) {
-  const explicit = String(input.settlementKey || '').trim()
-  if (explicit) return explicit
-  const battleId = String(input.entryLock?.battleId || '').trim()
-  if (battleId) return `battle:${battleId}`
-  return `once:${input.mode}:${input.selectedId || 'none'}:${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+/** Mirrors matchSettlement.makeMatchId */
+function makeMatchId(input) {
+  if (input.matchId && String(input.matchId).trim()) return String(input.matchId).trim()
+  if (input.entryLock?.battleId) return `m_${input.entryLock.battleId}`
+  const sel = (input.selectedId || 'nof').slice(0, 12)
+  const mode = input.mode || 'cpu'
+  const opp = String(input.opponentName || 'opp')
+    .replace(/\s+/g, '_')
+    .slice(0, 16)
+  return `m_${mode}_${sel}_${opp}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
 }
 
-function claimSettlementKey(key, cap = 120) {
+/** Mirrors matchSettlement consumedSettlementKeys markConsumed */
+const consumedSettlementKeys = new Set()
+const CONSUMED_CAP = 80
+function markConsumed(key) {
   const k = String(key || '').trim()
-  if (!k) return true
-  if (k.startsWith('once:')) return true
-  const LS = 'rf_match_settled_v1'
-  let prev = []
-  try {
-    const raw = localStorage.getItem(LS)
-    prev = raw ? JSON.parse(raw) : []
-    if (!Array.isArray(prev)) prev = []
-  } catch {
-    prev = []
+  if (!k) return false
+  if (consumedSettlementKeys.has(k)) return true
+  consumedSettlementKeys.add(k)
+  if (consumedSettlementKeys.size > CONSUMED_CAP) {
+    const first = consumedSettlementKeys.values().next().value
+    if (first) consumedSettlementKeys.delete(first)
   }
-  if (prev.includes(k)) return false
-  const next = [k, ...prev.filter((x) => x !== k)].slice(0, cap)
-  localStorage.setItem(LS, JSON.stringify(next))
-  return true
+  return false
+}
+function clearSettlementConsumeGuard() {
+  consumedSettlementKeys.clear()
 }
 
 function xpForMatch(won, combo = 0, wager = 0) {
@@ -93,20 +95,23 @@ function xpForMatch(won, combo = 0, wager = 0) {
   return 15 + c * 3 + Math.min(15, Math.floor(w / 10))
 }
 
-/** Simulate settle: claim settlement then claim XP once. */
+/**
+ * Simulate settleMatch double-submit: session consume + XP claim once.
+ * Production also claims via /api/fighter action:match (tested below).
+ */
 function settleOnce(battleId, won = true) {
-  const key = buildSettlementKey({ entryLock: { battleId }, mode: 'cpu' })
-  if (!claimSettlementKey(key)) {
-    return { alreadySettled: true, xpGained: 0, settlementKey: key }
+  const matchId = makeMatchId({ entryLock: { battleId }, mode: 'cpu' })
+  if (markConsumed(matchId)) {
+    return { alreadySettled: true, xpGained: 0, matchId }
   }
-  const matchId = battleId
+  // XP key = same stable matchId (recordMatchProgress matchId || battleId)
   if (!claimMatchXpKey(matchId)) {
-    return { alreadySettled: true, xpGained: 0, settlementKey: key }
+    return { alreadySettled: true, xpGained: 0, matchId }
   }
   return {
     alreadySettled: false,
     xpGained: xpForMatch(won, 2, 20),
-    settlementKey: key,
+    matchId,
   }
 }
 
@@ -126,45 +131,53 @@ function check(name, fn) {
 
 console.log('G10 settlement idempotency')
 
-check('buildSettlementKey prefers battleId', () => {
-  const k = buildSettlementKey({
-    entryLock: { battleId: 'b_abc123' },
-    mode: 'cpu',
-  })
-  assert.equal(k, 'battle:b_abc123')
-})
-
-check('buildSettlementKey uses explicit override', () => {
-  const k = buildSettlementKey({
-    settlementKey: 'custom:1',
+check('makeMatchId prefers explicit matchId', () => {
+  const k = makeMatchId({
+    matchId: 'custom:1',
     entryLock: { battleId: 'b_x' },
     mode: 'cpu',
   })
   assert.equal(k, 'custom:1')
 })
 
+check('makeMatchId derives m_${battleId} from entryLock', () => {
+  const k = makeMatchId({
+    entryLock: { battleId: 'b_abc123' },
+    mode: 'cpu',
+  })
+  assert.equal(k, 'm_b_abc123')
+})
+
 check('first settle awards XP', () => {
+  clearSettlementConsumeGuard()
   const a = settleOnce('b_fight_1', true)
   assert.equal(a.alreadySettled, false)
   assert.ok(a.xpGained > 0)
-  assert.equal(a.settlementKey, 'battle:b_fight_1')
+  assert.equal(a.matchId, 'm_b_fight_1')
 })
 
 check('second settle same battle awards 0 XP', () => {
+  clearSettlementConsumeGuard()
+  store.clear()
   const a = settleOnce('b_fight_2', true)
   const b = settleOnce('b_fight_2', true)
   assert.equal(a.alreadySettled, false)
   assert.ok(a.xpGained > 0)
   assert.equal(b.alreadySettled, true)
   assert.equal(b.xpGained, 0)
+  assert.equal(a.matchId, b.matchId)
+  assert.equal(a.matchId, 'm_b_fight_2')
 })
 
 check('two different battles each award once', () => {
+  clearSettlementConsumeGuard()
+  store.clear()
   const a = settleOnce('b_a', true)
   const b = settleOnce('b_b', true)
   assert.equal(a.alreadySettled, false)
   assert.equal(b.alreadySettled, false)
   assert.equal(a.xpGained, b.xpGained)
+  assert.notEqual(a.matchId, b.matchId)
 })
 
 check('claimMatchXpKey alone is idempotent', () => {
@@ -173,14 +186,19 @@ check('claimMatchXpKey alone is idempotent', () => {
   assert.equal(claimMatchXpKey('m2'), true)
 })
 
-check('once: keys never block (unique ad-hoc finishes)', () => {
-  const k1 = buildSettlementKey({ mode: 'cpu', selectedId: 'f1' })
-  const k2 = buildSettlementKey({ mode: 'cpu', selectedId: 'f1' })
-  assert.ok(k1.startsWith('once:'))
-  assert.ok(k2.startsWith('once:'))
+check('markConsumed session guard is idempotent', () => {
+  clearSettlementConsumeGuard()
+  assert.equal(markConsumed('m_sess_1'), false) // first = not already
+  assert.equal(markConsumed('m_sess_1'), true) // second = already
+  assert.equal(markConsumed('m_sess_2'), false)
+})
+
+check('ad-hoc finishes without battleId get unique matchIds', () => {
+  const k1 = makeMatchId({ mode: 'cpu', selectedId: 'f1', opponentName: 'Bot' })
+  const k2 = makeMatchId({ mode: 'cpu', selectedId: 'f1', opponentName: 'Bot' })
+  assert.ok(k1.startsWith('m_cpu_'))
+  assert.ok(k2.startsWith('m_cpu_'))
   assert.notEqual(k1, k2)
-  assert.equal(claimSettlementKey(k1), true)
-  assert.equal(claimSettlementKey(k1), true) // once: always allows
 })
 
 check('win XP formula baseline', () => {
@@ -201,6 +219,20 @@ check('server claim-first: second insert does not award', () => {
   const a = serverMatch('b_srv_1')
   const b = serverMatch('b_srv_1')
   assert.equal(a.xpGained, 50)
+  assert.equal(b.alreadySettled, true)
+  assert.equal(b.xpGained, 0)
+})
+
+check('double-submit path: consume guard alone blocks XP even if claim cleared', () => {
+  clearSettlementConsumeGuard()
+  store.clear()
+  const battleId = 'b_consume_only'
+  const a = settleOnce(battleId, true)
+  // Wipe local XP claims but keep session consume set (tab still open)
+  store.clear()
+  const b = settleOnce(battleId, true)
+  assert.equal(a.alreadySettled, false)
+  assert.ok(a.xpGained > 0)
   assert.equal(b.alreadySettled, true)
   assert.equal(b.xpGained, 0)
 })
