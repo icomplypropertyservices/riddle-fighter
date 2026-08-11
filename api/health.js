@@ -1,5 +1,5 @@
 /**
- * GET /api/health — fighter product health (includes Xaman readiness).
+ * GET /api/health — fighter product health (Xaman + Neon store readiness).
  */
 export default function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
@@ -21,10 +21,28 @@ export default function handler(req, res) {
       String(process.env.XUMM_API_SECRET || process.env.XAMAN_API_SECRET || '').trim(),
   )
 
+  const dbUrl = (
+    process.env.DATABASE_URL ||
+    process.env.NEON_DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    ''
+  ).trim()
+  const store = dbUrl ? 'neon' : 'memory'
+  const neonReady = Boolean(dbUrl)
+
   res.status(200).json({
     ok: true,
     brand: 'Riddle Fighter',
     app: 'fighter',
+    service: 'riddle-fighter',
+    store,
+    neonReady,
+    ...(neonReady
+      ? {}
+      : {
+          warning:
+            'DATABASE_URL unset — match progress/wager log is instance-local memory. Set Neon DATABASE_URL on Vercel Production for durable multi-instance settle.',
+        }),
     xamanReady,
     xaman: xamanReady
       ? { signIn: true, path: '/api/xaman/payload' }
