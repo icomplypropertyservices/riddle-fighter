@@ -3,6 +3,6 @@
   "service": "riddle-fighter",
   "version": "1.8.0",
   "app": "fighter-nintendo-feel",
-  "rebuild": "2026-08-02-playability-pass",
-  "note": "Nintendo-style feel: edge attacks, hitstop, longer HP, input buffer, no mash spam, Easy default"
+  "rebuild": "2026-08-12-g10-settlement",
+  "note": "G10 single-path settlement: match claim-first XP, settleMatch once, no double XP; Nintendo feel retained"
 }
