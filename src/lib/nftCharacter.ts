@@ -18,7 +18,7 @@ import {
   wiringPalette,
 } from './collectionWiring'
 import { getCollectionLook } from '../game/render/collectionLooks'
-import { resolveFighterArt } from './nftArt'
+import { splitArtSlots } from './nftArt'
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n))
@@ -378,16 +378,14 @@ export function fighterFromNft(input: NftCharacterInput): Fighter {
     superName: firstTrait(tm, ['rf moveset', 'moveset', 'super move']) || undefined,
   })
   const wl = loadWl(id)
-  // Prefer RF portrait trait, then NEW art, then current image — NFT is the identity
+  // RF portrait trait can override display image, but never invent OLD/NEW slots
   const portrait = firstTrait(tm, ['rf portrait', 'portrait', 'battle portrait'])
-  const rawDisplay =
-    (portrait && /^https?:|ipfs/i.test(portrait) ? portrait : undefined) ||
-    input.newImage ||
-    input.image ||
-    input.originalImage
-  const display = resolveFighterArt({
+  const portraitUrl =
+    portrait && /^https?:|ipfs/i.test(portrait) ? portrait : undefined
+  // Split genesis (OLD) vs evolved (NEW) — do not collapse both onto display
+  const slots = splitArtSlots({
     name: input.name,
-    image: rawDisplay,
+    image: portraitUrl || input.image,
     originalImage: input.originalImage,
     newImage: input.newImage,
     taxon: cat.taxon,
@@ -409,9 +407,9 @@ export function fighterFromNft(input: NftCharacterInput): Fighter {
   const built: Fighter = {
     id: `nft-${id}`,
     name: displayName,
-    image: display || undefined,
-    originalImage: input.originalImage || display,
-    newImage: input.newImage,
+    image: slots.image || undefined,
+    originalImage: slots.originalImage || undefined,
+    newImage: slots.newImage,
     color,
     color2,
     stats: baseStats,

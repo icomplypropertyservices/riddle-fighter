@@ -9,9 +9,7 @@
  * mismatch between any two of them on a live app means that app is mid-deploy
  * or pinned to an old build.
  */
-export const SUITE_CHROME_VERSION = '2.1.0'
-
-export const ACCOUNT_URL = 'https://account.riddlewallet.com'
+export const SUITE_CHROME_VERSION = '2.1.5'
 
 export const SUITE_SHELL_URLS = {
   hub: 'https://riddlewallet.com',
@@ -35,6 +33,22 @@ export const SUITE_SHELL_URLS = {
   privacy: 'https://riddlewallet.com/privacy',
   terms: 'https://riddlewallet.com/terms',
 } as const
+
+/**
+ * Privacy & Account Center — live on riddle-account (account.riddlewallet.com).
+ * Deployed 2026-08-10 after long DEPLOYMENT_NOT_FOUND period.
+ */
+export const ACCOUNT_URL = "https://account.riddlewallet.com"
+
+/**
+ * Where the header credits/tier chip goes. Credits live in the wallet, so this
+ * is deliberately NOT ACCOUNT_URL — sending a credits chip to a privacy page
+ * would be wrong even though both are live.
+ *
+ * `/subscriptions` is a rewrite to the wallet SPA (see the wallet's
+ * vercel.json), so it resolves for deep links and in-app navigation alike.
+ */
+export const CREDITS_URL = `${SUITE_SHELL_URLS.wallet}/subscriptions`
 
 export type SuiteShellAppId = keyof typeof SUITE_SHELL_URLS
 
@@ -83,6 +97,10 @@ export const SUITE_MORE_PILLS = SUITE_APP_PILLS.filter((p) => !isPrimaryPill(p.i
 /** Label for the header overflow trigger. */
 export const SUITE_MORE_LABEL = 'More'
 
+/**
+ * Wallet / market bottom dock (max 5).
+ * Finance tools first · Games entry last for jumping into Civ/Cities/Fight.
+ */
 export const SUITE_BOTTOM_TABS: {
   id: SuiteShellAppId
   label: string
@@ -90,16 +108,16 @@ export const SUITE_BOTTOM_TABS: {
   icon: string
 }[] = [
   { id: 'wallet', label: 'Wallet', href: SUITE_SHELL_URLS.wallet, icon: '◇' },
-  { id: 'cafe', label: 'Cafe', href: SUITE_SHELL_URLS.cafe, icon: '▣' },
   { id: 'swap', label: 'Swap', href: SUITE_SHELL_URLS.swap, icon: '⇄' },
+  { id: 'cafe', label: 'Cafe', href: SUITE_SHELL_URLS.cafe, icon: '▣' },
   { id: 'scanner', label: 'Scan', href: SUITE_SHELL_URLS.scanner, icon: '◎' },
-  { id: 'hub', label: 'More', href: SUITE_SHELL_URLS.hub, icon: '⋯' },
+  { id: 'world', label: 'Games', href: SUITE_SHELL_URLS.world, icon: '◈' },
 ]
 
 /**
- * Game dock — Cities / Civ / Fight / Wallet / Cafe (max 6).
- * Reborn removed from bottom nav — Civilizations (Civ) is the game identity surface.
- * Header pill links Civilisations (civ.riddlewallet.com).
+ * Game dock — game surfaces first, wallet last (max 5).
+ * Order: Civ → Cities → Fight → Cafe (market) → Wallet
+ * Reborn removed — Civ is the game identity surface.
  */
 export type GameBottomTabId =
   | 'cities'
@@ -119,16 +137,16 @@ export type GameBottomTab = {
 
 export const GAME_SUITE_BOTTOM_TABS: GameBottomTab[] = [
   {
-    id: 'cities',
-    label: 'Cities',
-    href: `${SUITE_SHELL_URLS.cities}?mode=build`,
-    icon: '🏙',
-  },
-  {
     id: 'civ',
     label: 'Civ',
     href: SUITE_SHELL_URLS.world,
     icon: '◈',
+  },
+  {
+    id: 'cities',
+    label: 'Cities',
+    href: `${SUITE_SHELL_URLS.cities}?mode=build`,
+    icon: '🏙',
   },
   {
     id: 'fighter',
@@ -137,16 +155,16 @@ export const GAME_SUITE_BOTTOM_TABS: GameBottomTab[] = [
     icon: '⚔',
   },
   {
-    id: 'wallet',
-    label: 'Wallet',
-    href: SUITE_SHELL_URLS.wallet,
-    icon: '◇',
-  },
-  {
     id: 'cafe',
     label: 'Cafe',
     href: SUITE_SHELL_URLS.cafe,
     icon: '▣',
+  },
+  {
+    id: 'wallet',
+    label: 'Wallet',
+    href: SUITE_SHELL_URLS.wallet,
+    icon: '◇',
   },
 ]
 
@@ -156,9 +174,9 @@ export function gameBottomTabs(
   opts?: { citiesMode?: 'build' | 'civ' | string },
 ): GameBottomTab[] {
   const mode = opts?.citiesMode
-  // world/reborn no longer a dock tab — map to civ for continuity
+  // Legacy world/reborn app ids map to Civilisations (civ)
   const resolved: GameBottomTabId =
-    active === 'world' ? 'civ' : (active as GameBottomTabId)
+    active === 'world' || (active as string) === 'reborn' ? 'civ' : (active as GameBottomTabId)
   return GAME_SUITE_BOTTOM_TABS.map((t) => {
     let isActive = t.id === resolved
     // On Cities host: highlight Cities vs Civ by mode when provided

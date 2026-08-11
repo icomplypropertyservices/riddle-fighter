@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Riddle Fighter — Pose / Walk strip preview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, Segoe UI, sans-serif;
+        background: #0a0a10;
+        color: #f4f4f8;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        max-width: 1100px;
+      }
+      h1 {
+        font-size: 1.15rem;
+        margin: 0 0 8px;
+      }
+      p {
+        color: #a1a1aa;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 12px 0;
+        align-items: center;
+      }
+      select,
+      button {
+        background: #111118;
+        color: #f4f4f8;
+        border: 1px solid #2a2a3a;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+      button {
+        cursor: pointer;
+        background: #5b21b6;
+        border-color: #7c3aed;
+      }
+      #strip {
+        background: #050508;
+        border: 1px solid #27272a;
+        border-radius: 12px;
+        padding: 12px;
+        overflow-x: auto;
+        min-height: 200px;
+      }
+      #strip canvas {
+        image-rendering: auto;
+        background: repeating-conic-gradient(#18181b 0% 25%, #0c0c12 0% 50%) 50% / 16px 16px;
+        border-radius: 8px;
+      }
+      .note {
+        font-size: 11px;
+        color: #71717a;
+      }
+      code {
+        color: #c4b5fd;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Riddle Fighter — multi-frame walk / pose preview</h1>
+    <p>
+      Opens in the <strong>built app</strong> context or after importing the render modules from the
+      fighter SPA. For a standalone strip of the in-engine bake pipeline, run the fighter site, open
+      DevTools, and call:
+    </p>
+    <pre class="note">
+// From fighter.riddlewallet.com console after a fight loads:
+// (modules are bundled — use the in-app debug hook below)
+window.__riddleFighterPreviewWalk?.('starter')
+    </pre>
+    <p>
+      Artist brief for hand-painted sheets (Phase 3 external art):
+      <code>256×384</code> transparent PNG per frame · side view · feet near bottom · 8–12 walk frames ·
+      opposite arm/leg gait · loop-safe first/last.
+    </p>
+    <div class="row">
+      <label>
+        Collection look
+        <select id="look">
+          <option value="starter">starter</option>
+          <option value="inquisition">inquisition</option>
+          <option value="inquiry">inquiry</option>
+          <option value="reborn">reborn</option>
+          <option value="bridge">bridge</option>
+        </select>
+      </label>
+      <button type="button" id="go">Render walk strip (needs app hook)</button>
+    </div>
+    <div id="strip"></div>
+    <p class="note">
+      This HTML is the tooling entry for artists. Runtime bake lives in
+      <code>src/game/render/frameBake.ts</code> and plays in the arena automatically.
+    </p>
+    <script>
+      document.getElementById('go').onclick = () => {
+        const id = document.getElementById('look').value
+        const strip = document.getElementById('strip')
+        strip.innerHTML = ''
+        if (typeof window.__riddleFighterPreviewWalk === 'function') {
+          const c = window.__riddleFighterPreviewWalk(id)
+          if (c) strip.appendChild(c)
+          else strip.textContent = 'Bake not ready — open a fight first so packs generate.'
+        } else {
+          strip.textContent =
+            'Hook missing. Serve fighter app and inject window.__riddleFighterPreviewWalk from frameBake.compositeWalkStrip.'
+        }
+      }
+    </script>
+  </body>
+</html>

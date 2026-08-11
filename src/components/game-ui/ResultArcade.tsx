@@ -1,6 +1,8 @@
 /**
- * Post-fight KO / WIN panel — arcade cabinet energy.
+ * Post-fight KO parchment — arcade cabinet finish (SF KO energy).
  */
+import { KoBanner } from '../../ui/KoBanner'
+
 type Props = {
   won: boolean
   line: string
@@ -27,9 +29,16 @@ export function ResultArcade({
   onLobby,
 }: Props) {
   return (
-    <section className={`g-result${won ? ' is-win' : ' is-lose'}`} aria-live="polite">
-      <div className="g-result-frame">
-        <div className="g-result-banner">{won ? 'YOU WIN' : 'YOU LOSE'}</div>
+    <section
+      className={`g-result med-result med-ko-panel${won ? ' is-win' : ' is-lose'}`}
+      aria-live="polite"
+    >
+      <div className="g-result-frame med-ko-parchment">
+        <KoBanner
+          won={won}
+          text={won ? 'YOU WIN' : 'YOU LOSE'}
+          className="g-result-banner med-ko-seal"
+        />
         <div className="g-result-body">
           {fighterImage ? (
             <div
@@ -60,7 +69,11 @@ export function ResultArcade({
         </div>
         <div className="g-result-actions">
           {onRematch ? (
-            <button type="button" className="btn btn-ok g-result-btn" onClick={onRematch}>
+            <button
+              type="button"
+              className="btn btn-ok g-result-btn med-decree"
+              onClick={onRematch}
+            >
               Again
             </button>
           ) : null}

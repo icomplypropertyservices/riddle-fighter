@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   FightEngine,
   type EngineSnapshot,
@@ -11,6 +11,8 @@ import { unlockAudio } from '../lib/audio'
 import { enterFightFullscreen, exitFightFullscreen, vibrate } from '../lib/fullscreen'
 import { mergePad, pollGamepad } from '../lib/gamepad'
 import { PsControls } from './PsControls'
+import { FightInstructions } from './FightInstructions'
+import { withCombatPowers } from '../lib/traitPowers'
 
 export type ArenaMode = 'cpu' | 'local2p' | 'online-host' | 'online-guest'
 
@@ -52,6 +54,8 @@ export function Arena({
   const keysP2 = useRef<Partial<InputState>>({})
   /** Mobile: collapse PsControls legend into a toggle (keeps stage clear). */
   const [legendOpen, setLegendOpen] = useState(false)
+  /** Desktop instruction overlay until dismissed */
+  const [showHowTo, setShowHowTo] = useState(true)
   const guestInput = useRef<InputState>({
     left: false,
     right: false,
@@ -63,18 +67,48 @@ export function Arena({
     special: false,
   })
 
+  // NFT trait-powered fighters (every trait → combat function)
+  const poweredP1 = useMemo(() => withCombatPowers(p1), [p1])
+  const poweredP2 = useMemo(() => withCombatPowers(p2), [p2])
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     ended.current = false
+    setShowHowTo(true)
     unlockAudio()
+    // Always fullscreen + immersive for the entire match
+    document.documentElement.classList.add('fight-immersive')
+    document.body.classList.add('fight-immersive')
+    document.body.dataset.fightActive = '1'
     void enterFightFullscreen(shellRef.current || document.documentElement)
     vibrate(8)
+    let fsRetried = false
+    const retryFs = () => {
+      void enterFightFullscreen(shellRef.current || document.documentElement)
+      if (!fsRetried) {
+        fsRetried = true
+      }
+    }
+    // Keep re-entering FS if user leaves early during fight
+    const onFsChange = () => {
+      if (ended.current) return
+      if (!document.fullscreenElement) {
+        window.setTimeout(() => {
+          if (!ended.current) {
+            void enterFightFullscreen(shellRef.current || document.documentElement)
+          }
+        }, 200)
+      }
+    }
+    window.addEventListener('pointerdown', retryFs, true)
+    window.addEventListener('keydown', retryFs, true)
+    document.addEventListener('fullscreenchange', onFsChange)
 
     const p2Mode =
       mode === 'cpu' ? 'cpu' : mode === 'online-guest' ? 'remote-guest' : 'human'
 
-    const eng = new FightEngine(canvas, p1, p2, {
+    const eng = new FightEngine(canvas, poweredP1, poweredP2, {
       p2Mode,
       roundsToWin,
       difficulty,
@@ -84,6 +118,7 @@ export function Arena({
           ended.current = true
           const maxCombo = eng.maxComboThisMatch
           window.setTimeout(() => {
+            document.body.dataset.fightActive = '0'
             void exitFightFullscreen()
             onMatchEnd(side, { maxCombo })
           }, 900)
@@ -197,13 +232,17 @@ export function Arena({
       engineRef.current = null
       window.removeEventListener('keydown', kd)
       window.removeEventListener('keyup', ku)
+      window.removeEventListener('pointerdown', retryFs, true)
+      window.removeEventListener('keydown', retryFs, true)
+      document.removeEventListener('fullscreenchange', onFsChange)
+      document.body.dataset.fightActive = '0'
       if (hostSetP2InputRef) hostSetP2InputRef.current = null
       if (guestApplySnapRef) guestApplySnapRef.current = null
       void exitFightFullscreen()
     }
   }, [
-    p1,
-    p2,
+    poweredP1,
+    poweredP2,
     mode,
     roundsToWin,
     difficulty,
@@ -222,12 +261,39 @@ export function Arena({
   }
 
   return (
-    <div className="arena-root fight-shell" ref={shellRef}>
-      <div className="arena-stage">
+    <div
+      className="arena-root fight-shell med-arena-chrome"
+      ref={shellRef}
+      data-fight-fullscreen="1"
+    >
+      {showHowTo ? (
+        <FightInstructions
+          p1={poweredP1}
+          p2={poweredP2}
+          local2p={mode === 'local2p'}
+          onDismiss={() => setShowHowTo(false)}
+        />
+      ) : null}
+      <div className="arena-stage med-arena-stage-inner">
         <div className="arena-wrap">
           <canvas ref={canvasRef} width={960} height={540} aria-label="Fight arena" />
         </div>
-        {/* Mobile: left move · right actions (both sides). Desktop: hidden — keyboard. */}
+        {/* Corner NFT nameplates — live traits matter */}
+        <div className="fight-nft-tags" aria-hidden>
+          <div className="fight-nft-tag fight-nft-tag--p1">
+            <span>{poweredP1.name}</span>
+            <em>
+              ATK {poweredP1.stats.atk} · DEF {poweredP1.stats.def}
+            </em>
+          </div>
+          <div className="fight-nft-tag fight-nft-tag--p2">
+            <span>{poweredP2.name}</span>
+            <em>
+              ATK {poweredP2.stats.atk} · DEF {poweredP2.stats.def}
+            </em>
+          </div>
+        </div>
+        {/* Mobile: left move · right actions. Desktop: keyboard (overlay + howto). */}
         <div className="ps-overlay ps-overlay-mobile" aria-label="Touch controls">
           {mode === 'local2p' ? (
             <>
@@ -241,14 +307,36 @@ export function Arena({
             </>
           )}
         </div>
+        {/* Desktop sticky mini legend (always on during fight) */}
+        <div className="fight-desktop-keys keys-desktop" data-testid="desktop-key-legend">
+          <span>
+            <kbd>←→</kbd> move
+          </span>
+          <span>
+            <kbd>↑</kbd> jump
+          </span>
+          <span>
+            <kbd>J</kbd> punch
+          </span>
+          <span>
+            <kbd>K</kbd> kick
+          </span>
+          <span>
+            <kbd>L</kbd> block
+          </span>
+          <span>
+            <kbd>U</kbd> special
+          </span>
+          <button
+            type="button"
+            className="fight-desktop-keys__help"
+            onClick={() => setShowHowTo(true)}
+          >
+            ?
+          </button>
+        </div>
       </div>
-      <div className="fight-control-legend">
-        {/* Desktop: always show key legend */}
-        <p className="hint keys-hint fight-tips keys-desktop">
-          <b>Desktop</b> · Arrows move · <kbd>J</kbd>/<kbd>Space</kbd> Punch · <kbd>K</kbd> Kick ·{' '}
-          <kbd>L</kbd> Block · <kbd>U</kbd> Special (tap, not hold) · Secret: full meter + SP or ↓↘→ J
-        </p>
-        {/* Phones: legend collapses behind a ≥44px toggle */}
+      <div className="fight-control-legend med-fight-legend">
         <div className="fight-legend-mobile keys-mobile">
           <button
             type="button"
@@ -257,12 +345,12 @@ export function Arena({
             aria-controls="fight-legend-panel"
             onClick={() => setLegendOpen((v) => !v)}
           >
-            {legendOpen ? 'Hide controls' : 'Controls · moves'}
+            {legendOpen ? 'Hide controls' : 'Controls · arts'}
           </button>
           {legendOpen ? (
             <div id="fight-legend-panel" className="fight-legend-panel">
               <p className="hint keys-hint fight-tips">
-                <b>Touch</b> · Left pad = move · Right pad = ✕ punch · ○ kick · □ block · △ special
+                <b>Touch</b> · Left pad = move · Right = ✕ punch · ○ kick · □ block · △ special
               </p>
               <p className="hint keys-hint fight-tips">
                 SECRET: ↓↘→ then ✕ @ full meter · SUPER: ←↙↓ then ○

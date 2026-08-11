@@ -1,0 +1,173 @@
+/**
+ * CASTLE TOKENS — single source of truth (SSOT)
+ * Solid fills only — no product gradients, no neon purple.
+ * Scope: :root + [data-med-arena] + [data-castle-shell] + [data-med-shell]
+ */
+
+:root,
+[data-med-shell],
+[data-med-shell='1'],
+[data-med-arena],
+[data-med-arena='1'],
+[data-castle-shell],
+[data-castle-shell='1'] {
+  /* —— Core palette —— */
+  --castle-ink: #0a0806;
+  --castle-bg: #0a0806;
+  --castle-panel: #14100c;
+  --castle-panel-2: #1c1610;
+  --castle-iron: #2a2218;
+  --castle-edge: #3d2e1a;
+  --castle-edge-hi: #6b4e24;
+  --castle-edge-bright: #6b4e24;
+  --castle-gold: #c9a227;
+  --castle-gold-hi: #e8c547;
+  --castle-gold-dim: #8a6a12;
+  --castle-crimson: #8b1538;
+  --castle-crimson-hi: #c41e3a;
+  --castle-blood: #4a0a14;
+  --castle-parchment: #e8d5a3;
+  --castle-parchment-dim: #c4a86a;
+  --castle-mute: #9a8b72;
+  --castle-text: #f5ecd4;
+  --castle-green: #3d8b5a;
+  --castle-ok: #3d8b5a;
+  --castle-p1: #c9a227;
+  --castle-p2: #b84a3a;
+  --castle-danger: #c41e3a;
+
+  /* —— med-* aliases (legacy arena) —— */
+  --med-ink: var(--castle-ink);
+  --med-panel: var(--castle-panel);
+  --med-panel-2: var(--castle-panel-2);
+  --med-edge: var(--castle-edge);
+  --med-edge-bright: var(--castle-edge-bright);
+  --med-gold: var(--castle-gold);
+  --med-gold-hi: var(--castle-gold-hi);
+  --med-gold-dim: var(--castle-gold-dim);
+  --med-crimson: var(--castle-crimson);
+  --med-crimson-hi: var(--castle-crimson-hi);
+  --med-blood: var(--castle-blood);
+  --med-parchment: var(--castle-parchment);
+  --med-parchment-dim: var(--castle-parchment-dim);
+  --med-mute: var(--castle-mute);
+  --med-text: var(--castle-text);
+  --med-green: var(--castle-green);
+
+  /* —— ma-* aliases (shell arena) —— */
+  --ma-bg: var(--castle-ink);
+  --ma-panel: var(--castle-panel);
+  --ma-panel-2: var(--castle-panel-2);
+  --ma-edge: var(--castle-edge);
+  --ma-edge-strong: var(--castle-edge-bright);
+  --ma-gold: var(--castle-gold);
+  --ma-gold-bright: var(--castle-gold-hi);
+  --ma-gold-dim: var(--castle-gold-dim);
+  --ma-crimson: var(--castle-crimson);
+  --ma-crimson-bright: var(--castle-crimson-hi);
+  --ma-blood: var(--castle-blood);
+  --ma-iron: var(--castle-iron);
+  --ma-parchment: var(--castle-parchment);
+  --ma-parchment-dim: var(--castle-parchment-dim);
+  --ma-mute: var(--castle-mute);
+  --ma-text: var(--castle-text);
+  --ma-p1: var(--castle-p1);
+  --ma-p2: var(--castle-p2);
+  --ma-ok: var(--castle-ok);
+  --ma-danger: var(--castle-danger);
+
+  /* —— Generic short aliases —— */
+  --bg: var(--castle-ink);
+  --card: var(--castle-panel);
+  --border: var(--castle-edge);
+  --text: var(--castle-text);
+  --muted: var(--castle-mute);
+  --violet: var(--castle-gold);
+  --fuchsia: var(--castle-gold-hi);
+  --cyan: var(--castle-gold-hi);
+  --purple: var(--castle-crimson);
+  --success: var(--castle-green);
+  --warn: var(--castle-gold-hi);
+  --danger: var(--castle-crimson-hi);
+}
+
+/* —— Arena / castle shell: kill neon purple; map fd-* + riddle-* to solid gold/crimson —— */
+[data-med-arena],
+[data-med-arena='1'],
+[data-castle-shell],
+[data-castle-shell='1'] {
+  /* riddle-* suite → castle gold / crimson (no neon violet/cyan/fuchsia) */
+  --riddle-bg: var(--castle-ink);
+  --riddle-card: var(--castle-panel);
+  --riddle-border: var(--castle-edge);
+  --riddle-text: var(--castle-text);
+  --riddle-muted: var(--castle-mute);
+  --riddle-violet: var(--castle-gold);
+  --riddle-fuchsia: var(--castle-gold-hi);
+  --riddle-cyan: var(--castle-parchment);
+  --riddle-success: var(--castle-green);
+  --riddle-warn: var(--castle-gold-hi);
+  --riddle-danger: var(--castle-crimson-hi);
+  --riddle-gold: var(--castle-gold);
+  --riddle-crimson: var(--castle-crimson);
+
+  /* fd-* dash → solid gold / crimson only */
+  --fd-bg: var(--castle-ink);
+  --fd-panel: var(--castle-panel);
+  --fd-edge: var(--castle-edge);
+  --fd-cyan: var(--castle-gold-hi);
+  --fd-pink: var(--castle-parchment);
+  --fd-violet: var(--castle-gold);
+  --fd-gold: var(--castle-gold-hi);
+  --fd-green: var(--castle-green);
+  --fd-red: var(--castle-crimson-hi);
+  --fd-text: var(--castle-text);
+  --fd-mute: var(--castle-mute);
+
+  /* kill leftover neon hooks */
+  --tw-shadow-color: transparent;
+  --cyan: var(--castle-gold-hi);
+  --violet: var(--castle-gold);
+  --fuchsia: var(--castle-gold-hi);
+  --purple: var(--castle-crimson);
+
+  color: var(--castle-text);
+  background: var(--castle-ink);
+}
+
+[data-castle-shell],
+[data-castle-shell='1'],
+[data-med-shell],
+[data-med-shell='1'] {
+  color: var(--castle-text);
+  background: var(--castle-ink);
+}
+
+/* Solid buttons under castle / arena shell */
+[data-castle-shell] .btn-primary,
+[data-castle-shell='1'] .btn-primary,
+[data-med-shell] .btn-primary,
+[data-med-shell='1'] .btn-primary,
+[data-med-arena] .btn-ok,
+[data-med-arena='1'] .btn-ok {
+  background: var(--castle-gold) !important;
+  border-color: var(--castle-gold-dim) !important;
+  color: var(--castle-ink) !important;
+  box-shadow: none !important;
+}
+
+[data-castle-shell] .btn-primary:hover,
+[data-castle-shell='1'] .btn-primary:hover,
+[data-med-shell] .btn-primary:hover,
+[data-med-shell='1'] .btn-primary:hover {
+  background: var(--castle-gold-hi) !important;
+}
+
+[data-castle-shell] .tool-card.active,
+[data-castle-shell='1'] .tool-card.active,
+[data-med-shell] .tool-card.active,
+[data-med-shell='1'] .tool-card.active {
+  border-color: var(--castle-gold) !important;
+  background: var(--castle-panel-2) !important;
+  box-shadow: 0 0 0 1px var(--castle-gold-dim) !important;
+}

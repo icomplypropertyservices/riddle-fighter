@@ -152,7 +152,10 @@ export function isMobileUa(): boolean {
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 }
 
-/** Open Xaman for the given payload (popup desktop / app scheme mobile). */
+/**
+ * Open Xaman app / web — only when the user taps "Open in Xaman".
+ * Desktop defaults stay on the in-page QR modal (do not auto-navigate).
+ */
 export function openXamanSignIn(uuid: string, nextAlways?: string): void {
   const links = xamanDeepLinks(uuid, nextAlways)
   try {
@@ -164,6 +167,7 @@ export function openXamanSignIn(uuid: string, nextAlways?: string): void {
       document.body.appendChild(a)
       a.click()
       a.remove()
+      // Fallback to universal link if the app did not take focus
       window.setTimeout(() => {
         if (document.visibilityState === 'visible') {
           window.open(links.web, '_blank', 'noopener,noreferrer')
@@ -171,6 +175,7 @@ export function openXamanSignIn(uuid: string, nextAlways?: string): void {
       }, 900)
       return
     }
+    // Desktop: open only when user requested — still a new window, never this SPA tab
     const w = 440
     const h = 720
     const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - w) / 2))
@@ -248,10 +253,13 @@ export async function waitXamanSignIn(
 }
 
 /**
- * Full flow: create SignIn payload → open Xaman → poll → bind address.
+ * Full flow: create SignIn payload → show QR on page → poll → bind address.
+ * Does NOT auto-open Xaman web (extra page). Caller shows refs.qr_png in a modal;
+ * openApp only for mobile deep-link convenience.
  */
 export async function connectXamanSignIn(opts?: {
   instruction?: string
+  /** Default false — keep QR on this page. true = deep-link / open Xaman. */
   openApp?: boolean
   onCreated?: (payload: XummPayloadCreated) => void
   onTick?: (status: XummPayloadStatus) => void
@@ -260,7 +268,7 @@ export async function connectXamanSignIn(opts?: {
   try {
     const payload = await createXamanSignInPayload(opts?.instruction)
     opts?.onCreated?.(payload)
-    if (opts?.openApp !== false) {
+    if (opts?.openApp === true) {
       openXamanSignIn(payload.uuid, payload.next?.always)
     }
     const result = await waitXamanSignIn(payload.uuid, {

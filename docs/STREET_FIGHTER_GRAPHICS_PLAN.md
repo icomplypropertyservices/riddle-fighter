@@ -112,24 +112,30 @@ Engine (sim) ──► FighterState (x,y,facing,attackKind,attackFrame,hitstun,�
  
 
 ### Phase 2 — Move fidelity
-- [ ] Per-slot active-frame flash + attack box debug toggle  
-- [ ] Afterimages on special/secret  
-- [ ] Hitstop camera punch polish  
-- [ ] Distinct recovery poses  
+- [x] Afterimages on special/secret/dash  
+- [x] Hitstop (impact freeze) + screen shake  
+- [x] Active attack trails + flash  
+- [x] Distinct recovery keys in punch/kick clips  
 
 ### Phase 3 — Art pipeline (real SF assets)
-- [ ] Base fighter sprite sheet template (A-pose + 8 clips × N frames)  
-- [ ] Optional per-collection skins  
-- [ ] Tooling: `scripts/export-pose-preview.html`  
-- [ ] Artist brief: canvas 256×384 per frame, transparent PNG  
+- [x] Multi-frame packs via `frameBake.ts` (walk 10 / idle 8 / attacks) per collection look  
+- [x] Runtime bake + playback in `fighterRenderer`  
+- [x] Tooling: `scripts/export-pose-preview.html` + `window.__riddleFighterPreviewWalk`  
+- [x] Artist brief: canvas 256×384 per frame, transparent PNG (see export-pose-preview.html)  
+- [ ] Optional hand-painted replacement sheets drop-in (same cell size)  
 
 ### Phase 4 — Stages
-- [ ] Parallax layers, crowd silhouettes, floor reflection quality  
-- [ ] Round callouts (FIGHT / KO / PERFECT) as sprite cards  
+- [x] Parallax drift + floor plane + reflection strip  
+- [x] Crowd silhouettes + mid haze  
+- [x] KO / finish flash grade  
+- [ ] PERFECT card sprite (optional polish)  
 
 ### Phase 5 — Juice
-- [ ] Super freeze + desat background  
-- [ ] Victory pose on match_end  
+- [x] Super freeze + desat background  
+- [x] Victory pose + WINNER banner on match_end  
+- [x] Smooth facing turn + walkSpeed gait  
+- [x] Immersive fullscreen fight shell  
+
 
 ---
 

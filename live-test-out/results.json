@@ -1,0 +1,384 @@
+{
+  "summary": {
+    "ts": "2026-08-11T19:31:23.993Z",
+    "outDir": "C:\\Users\\E-Store\\riddle-fighter\\live-test-out",
+    "pass": [
+      "fighter",
+      "civ"
+    ],
+    "fail": [
+      "cities",
+      "wallet"
+    ],
+    "feeTable": {
+      "fighter": {},
+      "wallet": {}
+    }
+  },
+  "results": [
+    {
+      "kind": "http",
+      "url": "https://fighter.riddlewallet.com/health.json",
+      "status": 200,
+      "ms": 329
+    },
+    {
+      "kind": "http",
+      "url": "https://cities.riddlewallet.com/",
+      "status": 200,
+      "ms": 196
+    },
+    {
+      "kind": "http",
+      "url": "https://fighter.riddlewallet.com/",
+      "status": 200,
+      "ms": 286
+    },
+    {
+      "kind": "http",
+      "url": "https://civ.riddlewallet.com/",
+      "status": 403,
+      "ms": 135
+    },
+    {
+      "kind": "http",
+      "url": "https://wallet.riddlewallet.com/",
+      "status": 200,
+      "ms": 121
+    },
+    {
+      "kind": "http",
+      "url": "https://city.riddlewallet.com/",
+      "status": 200,
+      "ms": 117
+    },
+    {
+      "kind": "http",
+      "url": "https://civ.riddlewallet.com/api/arena",
+      "status": 403,
+      "ms": 21
+    },
+    {
+      "kind": "http",
+      "url": "https://cities.riddlewallet.com/api/health",
+      "status": 200,
+      "ms": 189
+    },
+    {
+      "kind": "bundle",
+      "id": "cities",
+      "ok": false,
+      "status": 404,
+      "reason": "js-fetch-fail",
+      "bundle": "/assets/index-BFEkwGeJ.js"
+    },
+    {
+      "kind": "bundle",
+      "id": "fighter",
+      "ok": true,
+      "markers": {
+        "entryCredits": true,
+        "winnerPayout": true,
+        "platformCut": true,
+        "building_place": false,
+        "tourney_entry": true,
+        "battle_entry": true,
+        "suite_key": true,
+        "feeBps": true,
+        "suiteSpendTag": false,
+        "creditUnit": false
+      },
+      "feeHits": {},
+      "hasQuoteShape": true,
+      "size": 591684,
+      "bundlePath": "/assets/index-BYlV-GvV.js",
+      "status": 200
+    },
+    {
+      "kind": "bundle",
+      "id": "civ",
+      "ok": false,
+      "status": 403,
+      "reason": "html-not-200"
+    },
+    {
+      "kind": "bundle",
+      "id": "wallet",
+      "ok": true,
+      "markers": {
+        "entryCredits": false,
+        "winnerPayout": false,
+        "platformCut": false,
+        "building_place": false,
+        "tourney_entry": false,
+        "battle_entry": false,
+        "suite_key": false,
+        "feeBps": false,
+        "suiteSpendTag": false,
+        "creditUnit": false
+      },
+      "feeHits": {},
+      "hasQuoteShape": false,
+      "size": 540093,
+      "bundlePath": "next-chunks",
+      "status": 200
+    },
+    {
+      "kind": "browser",
+      "id": "cities",
+      "navStatus": 200,
+      "ui": {
+        "title": "Riddle Cities | Build · Travel · Trade",
+        "rootKids": 0,
+        "textLen": 0,
+        "economy": [],
+        "has777": false,
+        "buttons": [],
+        "forbidden": false
+      },
+      "clicked": [],
+      "consoleErrors": [
+        "Access to script at 'https://city.riddlewallet.com/assets/index-BFEkwGeJ.js' (redirected from 'https://cities.riddlewallet.com/assets/index-BFEkwGeJ.js') from origin 'https://cities.riddlewallet.com' has been blocked by ",
+        "Failed to load resource: net::ERR_FAILED",
+        "Access to script at 'https://city.riddlewallet.com/assets/index-BFEkwGeJ.js' (redirected from 'https://cities.riddlewallet.com/assets/index-BFEkwGeJ.js') from origin 'https://cities.riddlewallet.com' has been blocked by ",
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "failedReqs": [],
+      "bundle": {
+        "ok": false,
+        "status": 404,
+        "reason": "js-fetch-fail",
+        "bundle": "/assets/index-BFEkwGeJ.js"
+      },
+      "score": {
+        "ok": false,
+        "issues": [
+          "empty UI"
+        ]
+      }
+    },
+    {
+      "kind": "browser",
+      "id": "fighter",
+      "navStatus": 200,
+      "ui": {
+        "title": "Riddle Fighter · fighter.riddlewallet.com",
+        "rootKids": 1,
+        "textLen": 2739,
+        "economy": [
+          "ARENA LIVE",
+          "10 cr",
+          "10 cr",
+          "10 cr",
+          "25 cr",
+          "10 cr",
+          "10 CR",
+          "0 cr · need more",
+          "Riddle Wallet opens wallet.riddlewallet.com with app=fighter&action=connect (suite SSO). Xaman uses same-origin SignIn on this host.",
+          "Connect wallet to mint free Basic Human (1×), extra BH for 150 credits, or Reborn for 200 credits. On-chain Accept required.",
+          "0 cr",
+          "Every fight costs 10 cr entry (winner pot 20 cr). Optional match wager is extra. Tournament entry default 25 cr · 80% prize pool to champion. Top up in Wallet if short.",
+          "Match wager",
+          "STAKE (CR EACH)",
+          "Battle entry 10 cr · win pot 20 cr · optional wager off",
+          "BATTLE RECORD",
+          "0W · 0L · streak 0 · wagered 0 cr",
+          "RIDDLE SUITE · FIGHTER",
+          "Riddle Suite — one wallet, every app"
+        ],
+        "has777": false,
+        "buttons": [
+          "Skip to main content",
+          "riddleFIGHTER",
+          "Wallet",
+          "Swap",
+          "Bridge",
+          "Cafe",
+          "Scanner",
+          "More▾",
+          "free",
+          "@handle",
+          "SFX On",
+          "♪ On",
+          "Choose wallet",
+          "🛡VS CPUTrain10 cr",
+          "⚔2PSame phone10 cr",
+          "👑OnlineRoom10 cr",
+          "🏛TourneyBracket25 cr",
+          "📜OfferChallenge10 cr",
+          "FIGHT CPU10 cr",
+          "Create @handle on Social",
+          "I claimed it — Refresh",
+          "Connect Riddle Wallet",
+          "Connect Xaman",
+          "Hide details",
+          "Connect Riddle Wallet",
+          "Connect Xaman",
+          "Connect Xaman to mint",
+          "Fighters0",
+          "All0",
+          "Easy"
+        ],
+        "forbidden": false
+      },
+      "clicked": [
+        "riddleFIGHTER"
+      ],
+      "consoleErrors": [],
+      "failedReqs": [],
+      "bundle": {
+        "ok": true,
+        "markers": {
+          "entryCredits": true,
+          "winnerPayout": true,
+          "platformCut": true,
+          "building_place": false,
+          "tourney_entry": true,
+          "battle_entry": true,
+          "suite_key": true,
+          "feeBps": true,
+          "suiteSpendTag": false,
+          "creditUnit": false
+        },
+        "feeHits": {},
+        "hasQuoteShape": true,
+        "size": 591684,
+        "bundlePath": "/assets/index-BYlV-GvV.js",
+        "status": 200
+      },
+      "score": {
+        "ok": true,
+        "issues": []
+      }
+    },
+    {
+      "kind": "browser",
+      "id": "civ",
+      "navStatus": 200,
+      "ui": {
+        "title": "Riddle Civilisation | Command Dashboard",
+        "rootKids": 1,
+        "textLen": 508,
+        "economy": [
+          "Suite session: not connected"
+        ],
+        "has777": false,
+        "buttons": [
+          "riddleCIV",
+          "Wallet",
+          "Swap",
+          "Bridge",
+          "Cafe",
+          "Scanner",
+          "More▾",
+          "free",
+          "◇Connect wallet",
+          "Begin setup",
+          "Browse dashboard (setup later)",
+          "◈Civ",
+          "🏙Cities",
+          "⚔Fight",
+          "▣Cafe",
+          "◇Wallet"
+        ],
+        "forbidden": false,
+        "arenaLines": [
+          "1,000 cr"
+        ]
+      },
+      "clicked": [],
+      "consoleErrors": [],
+      "failedReqs": [],
+      "bundle": {
+        "ok": false,
+        "status": 403,
+        "reason": "html-not-200"
+      },
+      "score": {
+        "ok": true,
+        "issues": []
+      }
+    },
+    {
+      "kind": "browser",
+      "id": "wallet",
+      "navStatus": 200,
+      "ui": {
+        "title": "Riddle Wallet | Multi-chain wallet, NFTs & swap",
+        "rootKids": null,
+        "textLen": 1604,
+        "economy": [
+          "L2s under Ethereum (Base · Arb · OP · Polygon). Create or import freely — no suite link required.",
+          "NFT Street Fighter arena · suite credits · @handles — fighter.riddlewallet.com",
+          "Suite hub",
+          "RIDDLE SUITE · WALLET",
+          "Riddle Suite — one wallet, every app"
+        ],
+        "has777": false,
+        "buttons": [
+          "Skip to main content",
+          "Create wallet",
+          "I already have a wallet",
+          "In walletMy NFTsOwned XRPL NFTs in this wallet",
+          "Bridge",
+          "Swap",
+          "My NFTs",
+          "Suite hub",
+          "Wallet",
+          "Swap",
+          "Bridge",
+          "Scanner",
+          "Cafe",
+          "Cities",
+          "Civ",
+          "Dev",
+          "Social",
+          "Pay",
+          "Fight",
+          "Hub",
+          "X",
+          "Discord",
+          "Telegram",
+          "GitHub",
+          "Privacy",
+          "Terms",
+          "Privacy & data"
+        ],
+        "forbidden": true
+      },
+      "clicked": [
+        "GameFighterNFT Street Fighter arena · su",
+        "GameFighterNFT Street Fighter arena · su",
+        "GameFighterNFT Street Fighter arena · su"
+      ],
+      "consoleErrors": [],
+      "failedReqs": [],
+      "bundle": {
+        "ok": true,
+        "markers": {
+          "entryCredits": false,
+          "winnerPayout": false,
+          "platformCut": false,
+          "building_place": false,
+          "tourney_entry": false,
+          "battle_entry": false,
+          "suite_key": false,
+          "feeBps": false,
+          "suiteSpendTag": false,
+          "creditUnit": false
+        },
+        "feeHits": {},
+        "hasQuoteShape": false,
+        "size": 540093,
+        "bundlePath": "next-chunks",
+        "status": 200
+      },
+      "score": {
+        "ok": false,
+        "issues": [
+          "WAF/Forbidden page"
+        ]
+      }
+    }
+  ]
+}

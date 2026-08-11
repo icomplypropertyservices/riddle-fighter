@@ -42,13 +42,15 @@ img[data-suite-cover],
 }
 
 .rw-suite-header {
-  position: fixed;
-  inset-inline: 0;
-  top: 0;
+  /* Scrolls with the page — not sticky/fixed (suite rule: headers move on scroll) */
+  position: relative;
+  inset-inline: auto;
+  top: auto;
   z-index: 50;
   border-bottom: 1px solid #24262c;
   background: #09090b;
   padding-top: env(safe-area-inset-top, 0px);
+  width: 100%;
 }
 
 .rw-suite-header__row {
@@ -117,9 +119,29 @@ img[data-suite-cover],
 
 /* Content padding helpers when chrome is mounted */
 body.has-suite-chrome {
-  scroll-padding-top: var(--suite-header-h, calc(84px + env(safe-area-inset-top, 0px)));
-  --suite-header-h: calc(84px + env(safe-area-inset-top, 0px)); /* 44 row + 40 social rail */
+  /* Header is in-flow (not fixed) — no scroll-padding for a pinned header */
+  scroll-padding-top: 0;
+  --suite-header-h: 0px;
   --suite-bottom-h: calc(52px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Spacer was for fixed header offset — collapse when header scrolls with page */
+[data-suite-header-spacer='1'] {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+}
+
+/* TEMP: wallet product — no UnifiedSuiteHeader / bottom suite dock */
+body.has-suite-chrome.rw-no-suite-header {
+  --suite-header-h: env(safe-area-inset-top, 0px);
+  --suite-bottom-h: env(safe-area-inset-bottom, 0px);
+  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 3rem);
 }
 
 body.has-suite-chrome .suite-main,
@@ -147,9 +169,10 @@ body.has-suite-chrome [data-suite-main='1'],
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .rw-suite-header {
-  position: fixed;
-  inset-inline: 0;
-  top: 0;
+  /* Scrolls with the page — not sticky/fixed */
+  position: relative;
+  inset-inline: auto;
+  top: auto;
   z-index: 50;
   border-bottom: 1px solid #24262c;
   background: #09090b;
@@ -157,6 +180,7 @@ body.has-suite-chrome [data-suite-main='1'],
   display: block;
   visibility: visible;
   opacity: 1;
+  width: 100%;
 }
 
 .rw-suite-header__row {
@@ -287,17 +311,27 @@ body.has-suite-chrome [data-suite-main='1'],
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 26px;
-  padding: 0 8px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid #24262c;
-  background: #111118;
-  color: #c4b5fd;
-  font-size: 10px;
-  font-weight: 650;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  background: rgba(16, 185, 129, 0.12);
+  color: #a7f3d0;
+  font-size: 11px;
+  font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
   flex-shrink: 0;
+  /* Never collapse — credits must stay visible on every app header */
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.rw-suite-header__credits:hover {
+  border-color: rgba(52, 211, 153, 0.65);
+  background: rgba(16, 185, 129, 0.2);
+  color: #ecfdf5;
 }
 
 .rw-suite-header__credits-dot {
@@ -309,10 +343,21 @@ body.has-suite-chrome [data-suite-main='1'],
 
 .rw-suite-header__credits-tier {
   text-transform: capitalize;
+  color: #c4b5fd;
 }
 
 .rw-suite-header__credits-balance {
-  color: #d4d4d8;
+  color: #ecfdf5;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+/* Mobile: keep balance readable, hide only tier if space is tight */
+@media (max-width: 380px) {
+  .rw-suite-header__credits-tier {
+    display: none;
+  }
 }
 
 .rw-suite-header__sub {
@@ -711,9 +756,18 @@ body.has-suite-chrome [data-suite-main='1'],
   position: fixed;
   inset-inline: 0;
   bottom: 0;
-  z-index: 100;
+  /* Above bottom nav (45) and wallet prompts (75) so Accept is always hittable */
+  z-index: 200;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  /* Allow hits on the card only — outer shell does not steal clicks */
   pointer-events: none;
+}
+
+.rw-suite-consent[hidden],
+.rw-suite-consent--hidden {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 .rw-suite-consent__card {
@@ -728,6 +782,8 @@ body.has-suite-chrome [data-suite-main='1'],
   flex-direction: column;
   gap: 14px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  position: relative;
+  z-index: 1;
 }
 
 @media (min-width: 640px) {
@@ -765,6 +821,13 @@ body.has-suite-chrome [data-suite-main='1'],
   cursor: pointer;
   white-space: nowrap;
   transition: opacity 0.15s ease;
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+  min-height: 40px;
+  min-width: 7.5rem;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .rw-suite-consent__btn:hover {
@@ -779,6 +842,32 @@ body.has-suite-chrome [data-suite-main='1'],
 .rw-suite-consent__btn--reject {
   background: #3f3f46;
   color: #f4f4f8;
+}
+
+/*
+ * Show which choice is currently in force. Without this both buttons rendered
+ * identically, so clicking the already-active one (e.g. "Accept analytics"
+ * while analytics was already on) changed nothing on screen and read as a
+ * dead button. The state is already exposed via aria-pressed — this just
+ * makes it visible.
+ */
+.rw-suite-consent__btn[aria-pressed='true'] {
+  outline: 2px solid #c4b5fd;
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+.rw-suite-consent__btn[aria-pressed='true']::after {
+  content: ' ✓';
+  font-weight: 700;
+}
+
+.rw-suite-consent__btn[aria-pressed='false'] {
+  opacity: 0.62;
+}
+
+.rw-suite-consent__btn[aria-pressed='false']:hover {
+  opacity: 0.85;
 }
 
 /* Pre-hydrate placeholder — zero layout shift, no interaction */
@@ -905,10 +994,18 @@ body.has-suite-chrome [data-suite-main='1'],
 
 /* ── Header overflow menu (v2.1 simplified header) ───────────────────────── */
 
+/*
+ * Sibling of .rw-suite-header__pills, never a child: that nav is a scroll
+ * container (overflow-x:auto), and scroll containers clip both axes, which
+ * swallowed this dropdown entirely. Keep z-index above the pills row so the
+ * open menu paints over the header border.
+ */
 .rw-suite-header__more {
   position: relative;
   flex-shrink: 0;
   display: inline-flex;
+  overflow: visible;
+  z-index: 70;
 }
 
 .rw-suite-header__pill--more {

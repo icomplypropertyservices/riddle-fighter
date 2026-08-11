@@ -7,7 +7,7 @@ import {
   UnifiedSuiteFooter,
   SuiteConsentBanner,
 } from '@riddle/suite-chrome'
-import { useSuiteCredits } from '@riddle/suite-credits'
+import { useSuiteCreditsBridge } from '@riddle/suite-credits'
 import { SuiteHeader, FighterBottomNav } from './components/SuiteHeader'
 import {
   isAudioEnabled,
@@ -23,9 +23,11 @@ import type { EngineSnapshot, InputState, Side } from './game/engine'
 import {
   BATTLE_ENTRY_FEE,
   TOURNAMENT_ENTRY_FEE,
+  canAfford,
   creditsToUsd,
   formatCredits,
   getCredits,
+  insufficientCreditsMessage,
   lockBattleEntry,
   lockTournamentEntry,
   lockWagerStake,
@@ -36,16 +38,12 @@ import {
   refundBattleEntry,
   refundWagerLock,
   settleBattleLose,
-  settleBattleWin,
   settleTournamentWin,
-  settleWagerLose,
-  settleWagerWin,
   trySpendCredits,
   type BattleEntryLock,
   type WagerQuote,
 } from './lib/credits'
 import {
-  bumpFighterRecord,
   cpuFromOwned,
   fighterFromHandle,
   pickCpuOpponent,
@@ -59,7 +57,6 @@ import {
 } from './lib/difficulty'
 import {
   challengeUrl,
-  claimHandleUrl,
   clearCachedMyHandle,
   demoOpponentFromHandle,
   formatHandle,
@@ -77,6 +74,7 @@ import {
   purgePoisonedTestWalletEverywhere,
   readWalletSession,
   scrubHandoffQuery,
+  setManualAddress,
 } from './lib/nfts'
 import {
   connectRiddleWallet,
@@ -88,7 +86,7 @@ import {
   clearPendingXamanUuid,
   connectXamanSignIn,
   fetchXamanReady,
-  openXamanSignIn,
+  isMobileUa,
   readPendingXamanUuid,
   waitXamanSignIn,
   xamanDeepLinks,
@@ -105,7 +103,9 @@ import {
 } from './lib/starterHuman'
 import { ensureFighterArt } from './lib/nftArt'
 import { withCombatPowers } from './lib/traitPowers'
-import { BRAND, cafeBuyNftUrl, xrpCafeFightersUrl, SUITE } from './lib/suite'
+import { syncFighterToDb } from './lib/fighterProgress'
+import { settleMatch, type FinishMatchMode } from './lib/matchSettlement'
+import { BRAND, xrpCafeFightersUrl, SUITE } from './lib/suite'
 import {
   acceptOffer,
   cancelOffer,
@@ -113,8 +113,14 @@ import {
   listOffers,
   markOfferDone,
   offerShareUrl,
+  civChallengeUrl,
   parseOfferFromUrl,
+  offerCanFightNow,
+  offerWaitMs,
+  formatScheduleLabel,
   type FightOffer,
+  type FightStartMode,
+  type FightTargetKind,
 } from './lib/offers'
 import {
   destroyOnline,
@@ -127,16 +133,12 @@ import {
 import {
   loadScores,
   recordLabel as scoreRecordLabel,
-  recordMatch,
   winRate,
   type PlayerScore,
 } from './lib/scores'
 import {
-  comboFlavor,
-  fightWinLine,
   loadFunMeta,
   rankTitle,
-  recordFunMatch,
   streakFlavor,
   type FunMeta,
 } from './lib/fun'
@@ -145,7 +147,7 @@ import {
   getPublicNftCard,
   publishNftCard,
   readViewParam,
-  recordNftFight,
+  readOwnerParam,
   type NftPublicCard,
 } from './lib/nftFightHistory'
 import { NftDetail } from './components/NftDetail'
@@ -168,19 +170,19 @@ import {
   nextPlayableMatch,
   playerEntryCost,
   potLine,
+  quoteTournament,
   resolveMatch,
   saveTournament,
   type Tournament,
   type TourneySize,
+  type TourneyTheme,
 } from './lib/tournament'
 import {
-  GameHero,
-  ModeSelect,
-  MovesLegend,
   ResultArcade,
-  VsReadyBar,
   type PlayModeId,
 } from './components/game-ui'
+import { TourneyBoard } from './components/TourneyBoard'
+import { LobbyScreen, WalletConnectPanel, XamanQrModal } from './screens'
 
 type PlayMode = PlayModeId
 type Screen = 'lobby' | 'fight' | 'result' | 'tourney' | 'offer_inbox'
@@ -241,8 +243,11 @@ export default function App() {
     !isOnChainStarterFighter(starterFighter)
   const [selected, setSelected] = useState<Fighter | null>(null)
   const [p2Fighter, setP2Fighter] = useState<Fighter | null>(null)
-  /** Suite credits SSOT via @riddle/suite-credits (header chip uses same hooks). */
-  const { balance: credits, refresh: refreshCredits } = useSuiteCredits()
+  /** Suite credits SSOT — shared bridge (rdl_dev cookie + focus hydrate). */
+  const { balance: credits, refresh: refreshCredits, topUpUrl } =
+    useSuiteCreditsBridge({
+      topUpUrl: 'https://wallet.riddlewallet.com/?tab=credits&from=fighter',
+    })
   const [scores, setScores] = useState<PlayerScore>(() => loadScores())
   const [playMode, setPlayMode] = useState<PlayMode>('cpu')
   const [stake, setStake] = useState(10)
@@ -270,6 +275,15 @@ export default function App() {
   const [incomingOffer, setIncomingOffer] = useState<FightOffer | null>(null)
   const [offerMsg, setOfferMsg] = useState('')
   const [lastOfferLink, setLastOfferLink] = useState('')
+  const [offerStartMode, setOfferStartMode] = useState<FightStartMode>('immediate')
+  const [offerScheduleLocal, setOfferScheduleLocal] = useState(() => {
+    const d = new Date(Date.now() + 15 * 60_000)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  })
+  const [offerTargetKind, setOfferTargetKind] = useState<FightTargetKind>('open')
+  const [offerCivLink, setOfferCivLink] = useState('')
+  const [scheduleCountdown, setScheduleCountdown] = useState(0)
   const [funMeta, setFunMeta] = useState<FunMeta>(() => loadFunMeta())
   const lastFightVs = useRef<'cpu' | 'local2p' | 'handle'>('cpu')
   const [sfxOn, setSfxOn] = useState(() => isAudioEnabled())
@@ -282,15 +296,30 @@ export default function App() {
     }
   })
 
-  // World gateway deep-link: ?mode=cpu|local2p|online|tournament|offer&view=offers
+  // Deep-link: ?mode=offer&from=civ&stake=10&immediate=1&challenge=handle
   useEffect(() => {
     try {
       const q = new URLSearchParams(window.location.search)
       const mode = String(q.get('mode') || '').toLowerCase()
       const view = String(q.get('view') || '').toLowerCase()
-      if (view === 'offers' || mode === 'offer') {
+      const from = String(q.get('from') || '').toLowerCase()
+      const stakeQ = Number(q.get('stake') || 0)
+      const challenge = String(q.get('challenge') || '').replace(/^@/, '')
+      const immediate = q.get('immediate') !== '0'
+      if (stakeQ >= MIN_WAGER_CREDITS) {
+        setWagerOn(true)
+        setStake(Math.floor(stakeQ))
+      }
+      if (challenge) setHandle(challenge)
+      if (from === 'civ') {
+        setOfferTargetKind('civ')
         setPlayMode('offer')
-        setScreen('offer_inbox')
+      }
+      if (immediate) setOfferStartMode('immediate')
+      if (view === 'offers' || mode === 'offer' || q.get('offer') || q.get('o')) {
+        setPlayMode('offer')
+        if (q.get('offer') || q.get('o')) setScreen('offer_inbox')
+        else setScreen('lobby')
         return
       }
       if (mode === 'cpu' || mode === 'local2p' || mode === 'online' || mode === 'tournament') {
@@ -314,11 +343,17 @@ export default function App() {
 
   // Tournament
   const [tourney, setTourney] = useState<Tournament | null>(() => loadTournament())
-  const [tSize, setTSize] = useState<TourneySize>(4)
+  const [tSize, setTSize] = useState<TourneySize>(8)
   const [tEntry, setTEntry] = useState(TOURNAMENT_ENTRY_FEE)
   const [tHandles, setTHandles] = useState('')
+  const [tName, setTName] = useState('')
+  const [tTheme, setTTheme] = useState<TourneyTheme>('open')
+  const [tStartsLocal, setTStartsLocal] = useState('')
+  const [tDesc, setTDesc] = useState('')
   const [entryLocked, setEntryLocked] = useState(false)
   const tourneyMatchYouAreP1 = useRef(true)
+  /** G10: block re-entrant finishMatch until the next fight starts. */
+  const matchSettledRef = useRef(false)
 
   useEffect(() => {
     onlineRef.current = online
@@ -335,7 +370,7 @@ export default function App() {
     window.setTimeout(() => setToast(null), 2800)
   }, [])
 
-  // Public NFT deep-link: ?view=<nftId> shows OLD|NEW + history for anyone with the link
+  // Public / Civ deep-link: ?view|nftId=<id>&owner=<r…>&from=civ
   useEffect(() => {
     const v = readViewParam()
     if (!v) return
@@ -351,7 +386,7 @@ export default function App() {
         losses: 0,
         updatedAt: new Date().toISOString(),
       })
-      showToast('Public card not cached yet — owner must open View once')
+      showToast('Loading fighter card…')
     }
   }, [showToast])
 
@@ -361,8 +396,12 @@ export default function App() {
       nftId: nid,
       name: f.name,
       image: f.image,
+      // Keep genesis distinct from evolved — never copy image into both slots
       originalImage: f.originalImage || f.image,
-      newImage: f.newImage,
+      newImage:
+        f.newImage && f.newImage !== (f.originalImage || f.image)
+          ? f.newImage
+          : undefined,
       collection: f.collection,
       categoryLabel: f.categoryLabel,
       taxon: f.taxon,
@@ -386,8 +425,8 @@ export default function App() {
   const [nftProgress, setNftProgress] = useState('')
 
   const refreshNfts = useCallback(
-    async (addr: string) => {
-      if (!addr || !addr.startsWith('r')) return
+    async (addr: string): Promise<Fighter[] | undefined> => {
+      if (!addr || !addr.startsWith('r')) return undefined
       setNftLoading(true)
       setNftProgress('Scanning all owned NFTs…')
       try {
@@ -422,7 +461,10 @@ export default function App() {
             name: f.name,
             image: f.image,
             originalImage: f.originalImage || f.image,
-            newImage: f.newImage,
+            newImage:
+              f.newImage && f.newImage !== (f.originalImage || f.image)
+                ? f.newImage
+                : undefined,
             collection: f.collection,
             categoryLabel: f.categoryLabel,
             taxon: f.taxon,
@@ -432,6 +474,15 @@ export default function App() {
             wins: f.wins,
             losses: f.losses,
             specialName: f.specialName,
+          })
+          // Sync ALL traits + identity to fighter DB (W/L · XP later)
+          void syncFighterToDb({
+            nftId: nid,
+            ownerAddress: addr,
+            name: f.name,
+            image: f.image,
+            collection: f.collection,
+            traits: f.traits as { trait_type?: string; value?: unknown }[] | undefined,
           })
         }
         const withImg = list.filter((f) => f.image && f.fightable !== false)
@@ -474,11 +525,13 @@ export default function App() {
             setNftProgress('no owned fighters')
           }
         }
+        return list
       } catch {
         showToast('NFT load failed — reconnect wallet')
         setNftProgress('')
         setNftFighters([])
         setSelected(null)
+        return undefined
       } finally {
         setNftLoading(false)
       }
@@ -639,14 +692,15 @@ export default function App() {
         setConnectBusy(false)
         return
       }
+      // Desktop: QR stays in on-page modal. Mobile: deep-link into Xaman app.
       const res = await connectXamanSignIn({
         instruction: 'Riddle Fighter · Sign In to load your fighters (old collection scan)',
-        openApp: true,
+        openApp: isMobileUa(),
         signal: ac.signal,
         onCreated: (payload) => {
           setXamanPayload(payload)
-          setXamanStatus('Scan QR or open Xaman · waiting for SignIn…')
-          showToast('Xaman SignIn ready — approve in the Xaman app')
+          setXamanStatus('Scan QR in this popup · waiting for SignIn…')
+          showToast('Scan the Xaman QR on this page')
         },
         onTick: (st) => {
           if (st.meta?.signed) setXamanStatus('Signed — connecting…')
@@ -720,7 +774,7 @@ export default function App() {
       }
       refreshCredits()
       // Open Reborn mint surface with wallet + mode for AcceptOffer after mint
-      const u = new URL(SUITE.reborn)
+      const u = new URL(SUITE.civ || SUITE.world)
       u.searchParams.set('from', 'fighter')
       u.searchParams.set('mint', kind === 'basic-human' ? 'basic-human-extra' : 'reborn')
       u.searchParams.set('credits', String(price))
@@ -926,13 +980,51 @@ export default function App() {
       /* soft */
     }
     const sess = readWalletSession()
+    const ownerParam = readOwnerParam()
+    // Prefer suite session; Civ deep-link owner= only binds if it matches session
+    // or there is no session yet (preview load of that wallet's NFTs).
+    let bind = ''
     if (sess?.address && !isForbiddenPlayerAddress(sess.address)) {
-      setWalletAddr(sess.address)
+      bind = sess.address
+    } else if (
+      ownerParam &&
+      !isForbiddenPlayerAddress(ownerParam) &&
+      !isPoisonedTestWallet(ownerParam)
+    ) {
+      // Soft bind from Civ / Cities handoff so holdings appear immediately
+      bind = ownerParam
+      try {
+        const { writePlayerIdentity } = require('./lib/playerIdentity') as typeof import('./lib/playerIdentity')
+        writePlayerIdentity(ownerParam, 'civ-deep-link')
+      } catch {
+        /* soft — applyConnectedAddress still works */
+      }
+    }
+
+    if (bind) {
+      setManualAddress(bind, ownerParam && bind === ownerParam ? 'civ-deep-link' : 'suite-session')
+      setWalletAddr(bind)
+      setShowConnectPanel(false)
       scrubHandoffQuery()
-      void refreshNfts(sess.address)
-      void refreshMyHandle(sess.address)
+      void refreshNfts(bind).then((list) => {
+        const nid = readViewParam()
+        if (!nid || !list?.length) return
+        const hit = list.find(
+          (f) =>
+            f.nftId === nid ||
+            f.id === nid ||
+            f.id === `nft-${nid}` ||
+            Boolean(f.nftId && (nid.includes(f.nftId) || f.nftId.includes(nid.slice(0, 16)))),
+        )
+        if (hit) {
+          setSelected(hit)
+          openNftDetail(hit)
+          showToast(`Fighter ready · ${hit.name}`)
+        }
+      })
+      void refreshMyHandle(bind)
     } else {
-      // No personal wallet — purge game mint / issuer / poison ghosts + soft fakes
+      // No personal wallet — purge poison / issuer ghosts only
       purgeForbiddenPlayerSession()
       purgePoisonedTestWalletEverywhere()
       disconnectFighterWallet()
@@ -1051,6 +1143,15 @@ export default function App() {
     }
   }
 
+  /** Total suite credits needed to start a fight (entry + optional wager). */
+  const fightStartCost = (withWager: boolean): number => {
+    const w =
+      withWager && wagerOn && stake >= MIN_WAGER_CREDITS
+        ? Math.max(0, Math.floor(stake))
+        : 0
+    return BATTLE_ENTRY_FEE + w
+  }
+
   const lockOptionalWager = (): WagerQuote | null => {
     if (!wagerOn || stake < MIN_WAGER_CREDITS) return null
     const res = lockWagerStake(stake)
@@ -1063,31 +1164,160 @@ export default function App() {
     return res.quote
   }
 
-  /** Start CPU or local 2P or handle-as-CPU */
-  const createOffer = () => {
+  /**
+   * Create fight offer with your NFT + optional suite-credit wager.
+   * Locks challenger wager immediately so pot is real.
+   */
+  const createOffer = (opts?: { immediateFight?: boolean }) => {
     const me = requireEntry()
     if (!me) return
+    const stakeAmt = wagerOn ? Math.max(0, Math.floor(stake)) : 0
+    if (wagerOn && stakeAmt < MIN_WAGER_CREDITS) {
+      showToast(`Min wager ${MIN_WAGER_CREDITS} cr`)
+      return
+    }
+    // Only lock optional wager on create (battle entry locked when fight starts).
+    // Use a stable wagerRef so cancel/refund logs match the lock spend tag.
+    let wagerRef: string | undefined
+    let challengerWagerLocked = false
+    if (stakeAmt >= MIN_WAGER_CREDITS) {
+      wagerRef = `offer_wager_${Date.now().toString(36)}`
+      const res = lockWagerStake(stakeAmt, wagerRef)
+      if (!res.ok) {
+        showToast(res.error || 'Need credits for wager')
+        refreshCredits()
+        return
+      }
+      challengerWagerLocked = true
+      refreshCredits()
+    }
+
+    const targetHandle =
+      offerTargetKind === 'handle' || offerTargetKind === 'civ'
+        ? handle || resolvedHandle || undefined
+        : handle || undefined
+
+    const scheduledAt =
+      offerStartMode === 'scheduled' && offerScheduleLocal
+        ? new Date(offerScheduleLocal).toISOString()
+        : null
+
     const off = createFightOffer({
       challenger: me,
-      fromLabel: walletAddr ? `${walletAddr.slice(0, 6)}…` : 'You',
+      fromLabel:
+        myHandle?.handle
+          ? formatHandle(myHandle.handle)
+          : walletAddr
+            ? `${walletAddr.slice(0, 6)}…`
+            : 'You',
       fromAddress: walletAddr || undefined,
-      toHandle: handle || resolvedHandle || undefined,
-      stakeCredits: wagerOn ? stake : 0,
+      toHandle: targetHandle,
+      targetKind: offerTargetKind,
+      stakeCredits: stakeAmt,
       roundsToWin,
-      message: offerMsg,
+      message: offerMsg || (offerTargetKind === 'civ' ? 'Civ challenge' : undefined),
+      startMode: offerStartMode,
+      scheduledAt,
+      challengerWagerLocked,
+      wagerRef,
     })
     setOffers(listOffers())
     const link = offerShareUrl(off)
+    const civLink = civChallengeUrl(off)
     setLastOfferLink(link)
+    setOfferCivLink(civLink)
     void navigator.clipboard?.writeText(link)
-    showToast('Fight offer created · link copied')
+    showToast(
+      stakeAmt > 0
+        ? `Offer live · ${stakeAmt} cr wager locked · link copied`
+        : 'Fight offer created · link copied',
+    )
     setPlayMode('offer')
+
+    // Immediate: host can spar vs AI of their own offer NFT for practice? Skip.
+    // "Immediate fight" means acceptor fights now — creator waits for accept.
+    void opts
+  }
+
+  const startFightFromOffer = (off: FightOffer, me: Fighter) => {
+    if (!offerCanFightNow(off)) {
+      const wait = offerWaitMs(off)
+      const mins = Math.ceil(wait / 60_000)
+      showToast(`Scheduled · wait ~${mins} min (${formatScheduleLabel(off)})`)
+      setScheduleCountdown(wait)
+      return false
+    }
+    // Pre-check entry + matched wager so we never debit entry then roll back
+    const offerWager =
+      off.stakeCredits >= MIN_WAGER_CREDITS ? off.stakeCredits : 0
+    const need = BATTLE_ENTRY_FEE + offerWager
+    if (!canAfford(need)) {
+      showToast(
+        insufficientCreditsMessage(
+          need,
+          offerWager > 0 ? 'entry + wager' : 'battle entry',
+        ),
+      )
+      return false
+    }
+    const battle = lockBattleEntry()
+    if (!battle.ok) {
+      showToast(battle.error || 'Need credits for battle entry')
+      return false
+    }
+    // Acceptor (or solo start) locks their side of the wager
+    let locked: WagerQuote | null = null
+    if (offerWager > 0) {
+      const res = lockWagerStake(offerWager, battle.lock.battleId)
+      if (!res.ok) {
+        refundBattleEntry(battle.lock)
+        showToast(res.error || 'Need credits to match wager')
+        refreshCredits()
+        return false
+      }
+      locked = res.quote
+    }
+    refreshCredits()
+    matchSettledRef.current = false
+    setBattleLock(battle.lock)
+    setActiveQuote(locked)
+    setP2Fighter(off.challenger)
+    preloadFighterImages([off.challenger.image, me.image])
+    setArenaMode('cpu') // accepted NFT vs your NFT (AI uses their stats/art)
+    setRoundsToWin(off.roundsToWin)
+    setScreen('fight')
+    setIncomingOffer(null)
+    setOffers(listOffers())
+    markOfferDone(off.id)
+    showToast(
+      `Fight · ${BATTLE_ENTRY_FEE} cr entry` +
+        (locked ? ` + ${locked.stakeEach} cr wager` : '') +
+        ` · vs ${off.challenger.name}`,
+    )
+    return true
   }
 
   const acceptIncoming = () => {
     if (!incomingOffer) return
     const me = requireEntry()
     if (!me) return
+    if (!offerCanFightNow(incomingOffer)) {
+      const wait = offerWaitMs(incomingOffer)
+      setScheduleCountdown(wait)
+      showToast(
+        `Challenge is scheduled for ${formatScheduleLabel(incomingOffer)} · wait to fight`,
+      )
+      // Still accept (claim the challenge) but don't start yet
+      const queued = acceptOffer(incomingOffer.id, me, {
+        toAddress: walletAddr || undefined,
+      })
+      if (queued) {
+        setIncomingOffer(queued)
+        setOffers(listOffers())
+        showToast('Accepted · fight unlocks at scheduled time')
+      }
+      return
+    }
     const off = acceptOffer(incomingOffer.id, me, {
       toAddress: walletAddr || undefined,
     })
@@ -1095,36 +1325,32 @@ export default function App() {
       showToast('Offer not open')
       return
     }
-    const battle = lockBattleEntry()
-    if (!battle.ok) {
-      showToast(battle.error || 'Need credits for battle entry')
+    startFightFromOffer(off, me)
+  }
+
+  /** When a scheduled accepted offer is due — start fight. */
+  const startScheduledNow = () => {
+    if (!incomingOffer) return
+    const me = requireEntry()
+    if (!me) return
+    if (!offerCanFightNow(incomingOffer)) {
+      showToast(`Not yet · ${formatScheduleLabel(incomingOffer)}`)
       return
     }
-    // lock stake if any
-    let locked: WagerQuote | null = null
-    if (off.stakeCredits >= MIN_WAGER_CREDITS) {
-      const res = lockWagerStake(off.stakeCredits, battle.lock.battleId)
-      if (!res.ok) {
-        refundBattleEntry(battle.lock)
-        showToast(res.error || 'Need credits to accept wager')
-        refreshCredits()
-        return
-      }
-      locked = res.quote
-    }
-    refreshCredits()
-    setBattleLock(battle.lock)
-    setActiveQuote(locked)
-    setP2Fighter(off.challenger)
-    preloadFighterImages([off.challenger.image, me.image])
-    setArenaMode('cpu') // offline accept vs their NFT (AI uses their stats/art)
-    setRoundsToWin(off.roundsToWin)
-    setScreen('fight')
-    setIncomingOffer(null)
-    setOffers(listOffers())
-    markOfferDone(off.id)
-    showToast(`Fight · ${BATTLE_ENTRY_FEE} cr entry · vs ${off.challenger.name}`)
+    startFightFromOffer(incomingOffer, me)
   }
+
+  // Countdown for scheduled challenges
+  useEffect(() => {
+    if (!incomingOffer || offerCanFightNow(incomingOffer)) {
+      setScheduleCountdown(0)
+      return
+    }
+    const tick = () => setScheduleCountdown(offerWaitMs(incomingOffer))
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+  }, [incomingOffer])
 
   const startLocalFight = (vs: 'cpu' | 'local2p' | 'handle') => {
     const me = requireEntry()
@@ -1158,30 +1384,34 @@ export default function App() {
       mode = 'cpu'
     }
 
+    // Pre-check entry + optional wager before any debit
+    const withWager = wagerOn && stake >= MIN_WAGER_CREDITS
+    const need = fightStartCost(true)
+    if (!canAfford(need)) {
+      showToast(
+        insufficientCreditsMessage(
+          need,
+          withWager ? 'entry + wager' : 'battle entry',
+        ),
+      )
+      return
+    }
+
     const battle = lockBattleEntry()
     if (!battle.ok) {
       showToast(battle.error || 'Need credits for battle entry')
       return
     }
 
-    let locked: WagerQuote | null = null
-    if (vs !== 'local2p') {
-      locked = lockOptionalWager()
-      if (wagerOn && stake >= MIN_WAGER_CREDITS && !locked) {
-        refundBattleEntry(battle.lock)
-        refreshCredits()
-        return
-      }
-    } else if (wagerOn) {
-      locked = lockOptionalWager()
-      if (wagerOn && stake >= MIN_WAGER_CREDITS && !locked) {
-        refundBattleEntry(battle.lock)
-        refreshCredits()
-        return
-      }
+    let locked: WagerQuote | null = lockOptionalWager()
+    if (withWager && !locked) {
+      refundBattleEntry(battle.lock)
+      refreshCredits()
+      return
     }
 
     refreshCredits()
+    matchSettledRef.current = false
     setBattleLock(battle.lock)
     setActiveQuote(locked)
     setP2Fighter(opponent)
@@ -1216,19 +1446,31 @@ export default function App() {
           if (msg.type === 'hello' && msg.fighter) {
             setP2Fighter(msg.fighter)
             showToast('Opponent joined — starting…')
+            const withWager = wagerOn && stake >= MIN_WAGER_CREDITS
+            const need = fightStartCost(true)
+            if (!canAfford(need)) {
+              showToast(
+                insufficientCreditsMessage(
+                  need,
+                  withWager ? 'entry + wager' : 'battle entry',
+                ),
+              )
+              return
+            }
             const battle = lockBattleEntry()
             if (!battle.ok) {
               showToast(battle.error || 'Need credits for battle entry')
               return
             }
             const locked = lockOptionalWager()
-            if (wagerOn && stake >= MIN_WAGER_CREDITS && !locked) {
+            if (withWager && !locked) {
               refundBattleEntry(battle.lock)
               refreshCredits()
               showToast('Not enough credits for wager')
               return
             }
             refreshCredits()
+            matchSettledRef.current = false
             setBattleLock(battle.lock)
             setActiveQuote(locked)
             setArenaMode('online-host')
@@ -1271,6 +1513,7 @@ export default function App() {
             return
           }
           refreshCredits()
+          matchSettledRef.current = false
           setBattleLock(battle.lock)
           setP2Fighter(msg.fighter)
           setArenaMode('online-guest')
@@ -1296,122 +1539,83 @@ export default function App() {
     sendOnline(onlineRef.current, { type: 'snap', snap })
   }, [])
 
+  /** Single settlement path → lib/matchSettlement.settleMatch (G10 XP single path). */
   const finishMatch = useCallback(
     (
       won: boolean,
       opponentName: string,
       quote: WagerQuote | null,
-      mode: 'cpu' | 'pvp' | 'handle' | 'online' | 'tournament',
+      mode: FinishMatchMode,
       extraNote?: string,
       maxCombo = 0,
       entryLock?: BattleEntryLock | null,
+      /** Extra payout already granted (e.g. tournament prize) — still logged */
+      alreadyGrantedPayout = 0,
     ) => {
-      let payout = 0
-      const lock = entryLock ?? battleLock
-      // Fixed battle entry pot (not used for tournament — entry already on tourney path)
-      if (lock && mode !== 'tournament') {
-        if (won) {
-          settleBattleWin(lock)
-          payout += lock.winnerPayout
-        } else {
-          settleBattleLose(lock)
-        }
-      }
-      if (quote) {
-        if (won) {
-          settleWagerWin(quote, lock?.battleId)
-          payout += quote.winnerPayout
-        } else {
-          settleWagerLose(quote)
-        }
-      }
+      // Session guard: one finishMatch per fight (engine/online double-fire)
+      if (matchSettledRef.current) return
+      matchSettledRef.current = true
+      const settled = settleMatch({
+        won,
+        opponentName,
+        quote,
+        mode,
+        extraNote,
+        maxCombo,
+        entryLock: entryLock ?? battleLock,
+        alreadyGrantedPayout,
+        selected,
+        opponent: p2Fighter,
+        walletAddr,
+      })
       refreshCredits()
-      if (selected) {
-        bumpFighterRecord(selected.id, won)
-        const nid = selected.nftId || selected.id.replace(/^nft-/, '')
-        const matchMode =
-          mode === 'online' || mode === 'pvp'
-            ? 'pvp'
-            : mode === 'tournament'
-              ? 'pvp'
-              : mode === 'handle'
-                ? 'handle'
-                : 'cpu'
-        const entryStake = mode === 'tournament' ? 0 : lock?.stakeEach || BATTLE_ENTRY_FEE
-        recordNftFight(nid || selected.id, {
-          won,
-          opponent: opponentName,
-          mode: matchMode,
-          combo: maxCombo,
-          wagerCredits: (quote?.stakeEach || 0) + entryStake,
-          payoutCredits: won ? payout : 0,
-          note: comboFlavor(maxCombo) || undefined,
-        })
-        // Refresh public card W/L after fight
-        const wl = { wins: selected.wins + (won ? 1 : 0), losses: selected.losses + (won ? 0 : 1) }
-        publishNftCard({
-          nftId: nid,
-          name: selected.name,
-          image: selected.image,
-          originalImage: selected.originalImage || selected.image,
-          newImage: selected.newImage,
-          collection: selected.collection,
-          categoryLabel: selected.categoryLabel,
-          taxon: selected.taxon,
-          issuer: selected.issuer,
-          color: selected.color,
-          color2: selected.color2,
-          wins: wl.wins,
-          losses: wl.losses,
-          specialName: selected.specialName,
-        })
-        setSelected({ ...selected, wins: wl.wins, losses: wl.losses })
-        setNftFighters((prev) =>
-          prev.map((f) => (f.id === selected.id ? { ...f, wins: wl.wins, losses: wl.losses } : f)),
-        )
-      }
-      const fun = recordFunMatch({ won, comboMax: maxCombo, perfect: maxCombo >= 6 })
-      setFunMeta(fun)
-      const flavor = won ? streakFlavor(fun.winStreak) : ''
-      const cFlavor = comboFlavor(maxCombo)
-      const line = fightWinLine({
-        won,
-        streak: fun.winStreak,
-        combo: maxCombo,
-        category: selected?.category,
-      })
-      setResultLine(line)
-      const entryStake = mode === 'tournament' ? 0 : lock?.stakeEach || BATTLE_ENTRY_FEE
-      const sc = recordMatch({
-        won,
-        mode: mode === 'online' || mode === 'pvp' ? 'pvp' : mode === 'tournament' ? 'pvp' : mode === 'handle' ? 'handle' : 'cpu',
-        opponent: opponentName,
-        fighterName: selected?.name || 'Fighter',
-        wagerCredits: (quote?.stakeEach || 0) + entryStake,
-        payoutCredits: won ? payout : 0,
-      })
-      setScores(sc)
+      setFunMeta(settled.fun)
+      setResultLine(settled.resultLine)
+      setScores(settled.scores)
       setResult({
         won,
         opponent: opponentName,
-        payout: won ? payout : 0,
-        wager: (quote?.stakeEach || 0) + entryStake,
-        note: [extraNote, flavor, cFlavor, maxCombo >= 3 ? `Max combo ${maxCombo}` : '']
-          .filter(Boolean)
-          .join(' · '),
+        payout: won ? settled.payout : 0,
+        wager: settled.totalWager,
+        note: settled.resultNote,
       })
       setScreen('result')
       setActiveQuote(null)
       setBattleLock(null)
-      if (won) {
+      if (settled.playWinSfx) {
         try {
           sfx.ui()
         } catch {
           /* soft */
         }
       }
+      // Progress/XP/card toast — single path inside settleMatch (skip already-settled noise)
+      if (selected && !settled.alreadySettled) {
+        const selId = selected.id
+        void settled.progress.then((rp) => {
+          if (!rp) return
+          setSelected((prev) =>
+            prev && prev.id === selId
+              ? {
+                  ...prev,
+                  wins: rp.wins,
+                  losses: rp.losses,
+                  powerLevel: rp.powerLevel,
+                }
+              : prev,
+          )
+          setNftFighters((prev) =>
+            prev.map((f) =>
+              f.id === selId ? { ...f, wins: rp.wins, losses: rp.losses } : f,
+            ),
+          )
+          if (rp.xpGained > 0 || !/already settled/i.test(rp.toast)) {
+            showToast(rp.toast)
+          }
+        })
+      }
     },
-    [selected, battleLock],
+    [selected, battleLock, p2Fighter, walletAddr, showToast, refreshCredits],
   )
 
   const onMatchEnd = useCallback(
@@ -1459,12 +1663,28 @@ export default function App() {
             settleTournamentWin(pay, next.id)
             refreshCredits()
             setEntryLocked(false)
-            finishMatch(true, 'Tournament', null, 'tournament', `Champion · +${pay} cr pot`)
+            finishMatch(
+              true,
+              'Tournament',
+              null,
+              'tournament',
+              `Champion · +${pay} cr pot`,
+              maxCombo,
+              null,
+              pay,
+            )
           } else if (entryLocked && !champYou) {
             setEntryLocked(false)
-            finishMatch(false, 'Tournament', null, 'tournament', 'Eliminated — entry kept by pot')
+            finishMatch(
+              false,
+              'Tournament',
+              null,
+              'tournament',
+              'Eliminated — entry kept by pot',
+              maxCombo,
+            )
           } else {
-            finishMatch(!!champYou, 'Tournament', null, 'tournament')
+            finishMatch(!!champYou, 'Tournament', null, 'tournament', undefined, maxCombo)
           }
           return
         }
@@ -1534,14 +1754,31 @@ export default function App() {
     const me = requireEntry()
     if (!me) return
     const handles = tHandles
-      .split(/[,\s]+/)
+      .split(/[,\n,]+/)
       .map((h) => h.replace(/^@/, '').trim())
       .filter(Boolean)
-    const t = createTournamentSetup(me, tSize, tEntry, handles)
+    const startsAt = tStartsLocal
+      ? new Date(tStartsLocal).toISOString()
+      : null
+    const t = createTournamentSetup(me, tSize, tEntry, handles, {
+      name: tName || undefined,
+      theme: tTheme,
+      startsAt,
+      description: tDesc || undefined,
+      hostAddress: walletAddr || undefined,
+      hostHandle: myHandle?.handle || undefined,
+      civTags:
+        tTheme === 'civ' || tTheme === 'mixed'
+          ? ['Iron League', 'Void Court', 'Crown Holds', 'Ashen March']
+          : undefined,
+    })
     setTourney(t)
     saveTournament(t)
     setScreen('tourney')
-    showToast('Tournament ready — lock entry to start')
+    setEntryLocked(false)
+    showToast(
+      `${t.name} · ${t.size}p · entry ${formatCredits(t.entryCredits)} · pot ${formatCredits(t.pot)}`,
+    )
   }
 
   const lockTourneyAndStart = () => {
@@ -1604,6 +1841,7 @@ export default function App() {
     const oppSeat = getSeat(t, m.a === you.id ? m.b : m.a)
     if (!oppSeat) return
     tourneyMatchYouAreP1.current = m.a === you.id
+    matchSettledRef.current = false
     setP2Fighter(oppSeat.fighter)
     setArenaMode('cpu')
     setPlayMode('tournament')
@@ -1613,7 +1851,13 @@ export default function App() {
   }
 
   return (
-    <div className="app has-suite-chrome" data-suite-chrome="1" data-screen={screen}>
+    <div
+      className="app has-suite-chrome"
+      data-suite-chrome="1"
+      data-screen={screen}
+      data-med-arena="1"
+      data-castle-shell="1"
+    >
       <a
         href="#main"
         className="skip-to-main"
@@ -1673,7 +1917,7 @@ export default function App() {
                 })
               }}
             >
-              Choose wallet
+              Connect
             </button>
           )
         }
@@ -1684,23 +1928,7 @@ export default function App() {
                 className="chip suite-header-stat"
                 title="Your Riddle handle"
                 data-testid="header-my-handle"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
-                {myHandle.avatarUrl ? (
-                  <img
-                    src={myHandle.avatarUrl}
-                    alt=""
-                    width={18}
-                    height={18}
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      display: 'block',
-                    }}
-                  />
-                ) : null}
                 {formatHandle(myHandle.handle)}
               </span>
             ) : (
@@ -1716,55 +1944,12 @@ export default function App() {
                   })
                 }}
               >
-                @handle
+                @
               </button>
             )}
-            <span className="chip win suite-header-stat">
-              W <strong>{scores.wins}</strong>
-            </span>
-            <span className="chip lose suite-header-stat">
-              L <strong>{scores.losses}</strong>
-            </span>
-            <span
-              className={`chip suite-header-stat${funMeta.winStreak >= 2 ? ' streak-chip' : ''}`}
-            >
-              Streak <strong>{funMeta.winStreak}</strong>
-            </span>
             <span className="chip suite-header-stat">
-              {rankTitle(funMeta.rankPoints)} <strong>{funMeta.rankPoints}</strong>
+              {scores.wins}–{scores.losses}
             </span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm suite-header-sfx"
-              onClick={() => {
-                unlockAudio()
-                const next = !sfxOn
-                setSfxOn(next)
-                setAudioEnabled(next)
-                if (next) sfx.ui()
-              }}
-              aria-label={sfxOn ? 'SFX on' : 'SFX off'}
-            >
-              SFX {sfxOn ? 'On' : 'Off'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm suite-header-sfx"
-              onClick={() => {
-                unlockAudio()
-                const next = !musicOn
-                setMusicOn(next)
-                setMusicEnabled(next)
-                if (next) {
-                  startMusic()
-                  setMusicIntensity(screen === 'fight' ? 'fight' : 'lobby')
-                  sfx.ui()
-                }
-              }}
-              aria-label={musicOn ? 'Music on' : 'Music off'}
-            >
-              ♪ {musicOn ? 'On' : 'Off'}
-            </button>
           </>
         }
       />
@@ -1779,8 +1964,8 @@ export default function App() {
 
       {showTips && screen === 'lobby' ? (
         <div className="tutorial-banner" data-testid="tutorial-banner">
-          <b>How to play:</b> Connect wallet · select an owned NFT (required for Fight CPU) ·
-          @handle optional (challenges / identity only). Combos fill meter · Special @ 50 · Super @ 75 · Secret @ 100.
+          <b>3 steps:</b> Connect (Riddle / Xaman) → pick your NFT → Fight. Combos fill meter ·
+          Special 50 · Super 75 · Secret 100.
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -1800,621 +1985,134 @@ export default function App() {
       ) : null}
 
       {screen === 'lobby' && (
-        <div className="g-lobby-stack">
-          <div className="fd-build-tag">
-            FIGHTER · OWNED NFTS ONLY · XAMAN · EASY / MEDIUM / HARD / EXPERT
-          </div>
-
-          <GameHero
-            rankLabel={rankTitle(funMeta.rankPoints)}
-            rankPoints={funMeta.rankPoints}
-            streak={funMeta.winStreak}
-            wins={scores.wins}
-            losses={scores.losses}
-            selectedName={selected?.name}
-          />
-
-          <ModeSelect
-            value={playMode}
-            onChange={(id) => {
-              unlockAudio()
-              sfx.ui()
-              setPlayMode(id)
-            }}
-          />
-
-          <VsReadyBar
-            p1={selected}
-            p2={
-              playMode === 'local2p'
-                ? p2Fighter
-                : playMode === 'cpu'
-                  ? null
-                  : p2Fighter
-            }
-            p2Label={
-              playMode === 'cpu'
-                ? 'CPU rival on FIGHT'
-                : playMode === 'online'
-                  ? 'Online opponent'
-                  : playMode === 'tournament'
-                    ? 'Bracket foe'
-                    : playMode === 'offer'
-                      ? 'Offer target'
-                      : 'Pick P2 NFT'
-            }
-            ready={Boolean(
-              (selected || roster[0]) &&
-                (playMode === 'cpu' ||
-                  (playMode === 'local2p' &&
-                    ((p2Fighter && selected && p2Fighter.id !== selected.id) ||
-                      roster.length > 1)) ||
-                  playMode === 'online' ||
-                  playMode === 'tournament' ||
-                  playMode === 'offer'),
-            )}
-            readyLabel={
-              playMode === 'cpu'
-                ? 'FIGHT CPU'
-                : playMode === 'local2p'
-                  ? 'START 2P'
-                  : playMode === 'online'
-                    ? 'HOST / JOIN ↓'
-                    : playMode === 'tournament'
-                      ? 'SETUP ↓'
-                      : playMode === 'offer'
-                        ? 'OFFER ↓'
-                        : 'FIGHT'
-            }
-            entryCost={
+        <LobbyScreen
+          playMode={playMode}
+          onPlayModeChange={(id) => {
+            unlockAudio()
+            sfx.ui()
+            setPlayMode(id)
+          }}
+          credits={credits}
+          stake={stake}
+          onStakeChange={setStake}
+          wagerOn={wagerOn}
+          onWagerOnChange={setWagerOn}
+          roundsToWin={roundsToWin}
+          onRoundsToWinChange={setRoundsToWin}
+          tournamentEntry={tEntry || TOURNAMENT_ENTRY_FEE}
+          onFight={() => {
+            unlockAudio()
+            if (musicOn) startMusic()
+            sfx.ui()
+            const need =
               playMode === 'tournament' ? tEntry || TOURNAMENT_ENTRY_FEE : BATTLE_ENTRY_FEE
-            }
-            balance={credits}
-            insufficient={
-              credits <
-              (playMode === 'tournament' ? tEntry || TOURNAMENT_ENTRY_FEE : BATTLE_ENTRY_FEE)
-            }
-            onFight={() => {
-              unlockAudio()
-              if (musicOn) startMusic()
-              sfx.ui()
-              const need =
-                playMode === 'tournament' ? tEntry || TOURNAMENT_ENTRY_FEE : BATTLE_ENTRY_FEE
-              if (credits < need) {
-                showToast(
-                  `Need ${formatCredits(need)} · balance ${formatCredits(credits)}. Top up in Wallet.`,
-                )
-                return
-              }
-              if (playMode === 'cpu') startLocalFight('cpu')
-              else if (playMode === 'local2p') startLocalFight('local2p')
-              else showToast('Scroll down — finish host/join, bracket, or offer setup')
-            }}
-            disabled={playMode === 'cpu' && roster.length === 0}
-          />
-
-          {/* Riddle @handle — optional identity; Fight CPU requires selected NFT only */}
-          <section
-            className="panel g-panel"
-            id="fighter-handle"
-            data-testid="fighter-handle-panel"
-            style={
-              handleGateOpen && !myHandle
-                ? { borderColor: 'rgba(251, 191, 36, 0.55)', boxShadow: '0 0 0 1px rgba(251, 191, 36, 0.25)' }
-                : undefined
-            }
-          >
-            <h2 className="g-panel-title">Riddle handle</h2>
-            {myHandle?.handle ? (
-              <>
-                <p className="quote" data-testid="my-handle-display">
-                  You fight as{' '}
-                  <b style={{ color: '#a78bfa' }}>{formatHandle(myHandle.handle)}</b>
-                  {myHandle.displayName && myHandle.displayName !== myHandle.handle
-                    ? ` · ${myHandle.displayName}`
-                    : ''}
-                </p>
-                <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                  <a
-                    className="btn btn-ghost btn-sm"
-                    href={`${SUITE.social.replace(/\/$/, '')}/u/${encodeURIComponent(myHandle.handle)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View profile
-                  </a>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    disabled={myHandleLoading || !walletAddr}
-                    onClick={() => {
-                      unlockAudio()
-                      if (walletAddr) void refreshMyHandle(walletAddr)
-                    }}
-                  >
-                    {myHandleLoading ? 'Checking…' : 'Refresh handle'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="hint">
-                  <strong>Optional for Fight CPU.</strong> Claim a free Riddle{' '}
-                  <code>@handle</code> on Social (bound to your wallet) for challenges and
-                  identity. Fight CPU only needs a selected owned NFT.
-                </p>
-                {!walletAddr ? (
-                  <p className="quote">Connect a wallet first, then claim your @handle.</p>
-                ) : (
-                  <p className="quote">
-                    Wallet {walletAddr.slice(0, 8)}…{walletAddr.slice(-4)} has no handle yet
-                    {myHandleLoading ? ' · checking…' : ''}.
-                  </p>
-                )}
-                <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                  <a
-                    className="btn btn-ok"
-                    data-testid="claim-handle-cta"
-                    href={claimHandleUrl({
-                      address: walletAddr || undefined,
-                    })}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => unlockAudio()}
-                  >
-                    Create @handle on Social
-                  </a>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={myHandleLoading || !walletAddr}
-                    data-testid="refresh-my-handle"
-                    onClick={() => {
-                      unlockAudio()
-                      sfx.ui()
-                      if (!walletAddr) {
-                        showToast('Connect a wallet first')
-                        return
-                      }
-                      void refreshMyHandle(walletAddr).then((rec) => {
-                        if (rec) showToast(`Handle ready · ${formatHandle(rec.handle)}`)
-                        else showToast('Still no handle — finish claim on Social, then Refresh')
-                      })
-                    }}
-                  >
-                    {myHandleLoading ? 'Checking…' : 'I claimed it — Refresh'}
-                  </button>
-                </div>
-                {handleGateOpen ? (
-                  <p className="hint" style={{ color: '#fbbf24', marginBottom: 0 }}>
-                    @handle recommended for challenges — Fight CPU works once you select an NFT.
-                  </p>
-                ) : null}
-              </>
-            )}
-          </section>
-
-          {/* Wallet connect — Riddle Wallet (primary) + Xaman. No paste-to-test. */}
-          <section className="panel g-panel" id="fighter-wallet">
-            <h2 className="g-panel-title">Wallet · old collection</h2>
-            <p className="hint">
-              Choose a wallet: <strong>Riddle Wallet</strong> (suite SSO — pick which account) or{' '}
-              <strong>Xaman</strong> SignIn. On connect we scan the ledger and load{' '}
-              <strong>only NFTs you own</strong> from the old collection — Inquiry (taxon 0) +
-              Inquisition (taxon 2). No fake / hardcoded fighters.
-            </p>
-            {!walletAddr ? (
-              <div className="stack" style={{ gap: 10 }}>
-                <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                  <button
-                    type="button"
-                    className="btn btn-ok"
-                    data-testid="connect-riddle"
-                    disabled={connectBusy}
-                    onClick={onConnectRiddle}
-                  >
-                    {connectBusy && !xamanPayload
-                      ? 'Opening Riddle Wallet…'
-                      : 'Connect Riddle Wallet'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    data-testid="connect-wallet-chooser"
-                    onClick={() => {
-                      unlockAudio()
-                      sfx.ui()
-                      setShowConnectPanel((v) => !v)
-                    }}
-                  >
-                    {showConnectPanel ? 'Hide options' : 'External wallets'}
-                  </button>
-                </div>
-                {showConnectPanel ? (
-                  <div
-                    className="fd-connect-panel"
-                    style={{
-                      border: '1px solid #1f1f2e',
-                      borderRadius: 12,
-                      padding: 12,
-                      background: '#0c0c12',
-                    }}
-                  >
-                    <p className="hint" style={{ marginTop: 0 }}>
-                      <strong>Unified suite login</strong> — Riddle Wallet unlocks once, then Fighter /
-                      Cities / Cafe all see the same personal r… address.
-                    </p>
-                    <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-                      <button
-                        type="button"
-                        className="btn btn-ok"
-                        data-testid="connect-riddle-primary"
-                        disabled={connectBusy}
-                        onClick={onConnectRiddle}
-                        style={{ minWidth: 180 }}
-                      >
-                        {connectBusy && !xamanPayload
-                          ? 'Opening Riddle Wallet…'
-                          : 'Connect Riddle Wallet'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        data-testid="connect-xaman"
-                        disabled={connectBusy}
-                        onClick={() => void onConnectXaman()}
-                        style={{ minWidth: 140 }}
-                      >
-                        {connectBusy && xamanPayload
-                          ? 'Waiting for Xaman…'
-                          : 'Xaman (optional)'}
-                      </button>
-                    </div>
-                    <p className="hint" style={{ marginTop: 10, marginBottom: 0 }}>
-                      Opens <strong>wallet.riddlewallet.com?action=connect</strong> (suite SSO). Unlock
-                      your proper multi-chain wallet with PIN — never the old internal test account.
-                      {xamanReady === false
-                        ? ' · Xaman Platform probe failed — use Riddle Wallet.'
-                        : ''}
-                    </p>
-                    {xamanPayload ? (
-                      <div
-                        className="fd-xaman-panel"
-                        data-testid="xaman-signin-panel"
-                        style={{
-                          marginTop: 12,
-                          padding: 12,
-                          borderRadius: 12,
-                          border: '1px solid #3b2f6b',
-                          background: '#12101c',
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: 12,
-                          alignItems: 'center',
-                        }}
-                      >
-                        {xamanPayload.refs?.qr_png || xamanPayload.uuid ? (
-                          <img
-                            src={
-                              xamanPayload.refs?.qr_png ||
-                              xamanDeepLinks(xamanPayload.uuid).qrPng
-                            }
-                            alt="Xaman SignIn QR"
-                            width={160}
-                            height={160}
-                            style={{
-                              width: 160,
-                              height: 160,
-                              borderRadius: 8,
-                              background: '#fff',
-                            }}
-                          />
-                        ) : null}
-                        <div style={{ flex: 1, minWidth: 180 }}>
-                          <p className="quote" style={{ margin: '0 0 6px' }}>
-                            <b>Xaman SignIn</b>
-                            {xamanReady === true ? ' · Platform ready' : ''}
-                          </p>
-                          <p className="hint" style={{ margin: '0 0 8px' }}>
-                            {xamanStatus || 'Approve SignIn in Xaman — then we scan your NFTs'}
-                          </p>
-                          <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                            <button
-                              type="button"
-                              className="btn btn-ok"
-                              onClick={() =>
-                                openXamanSignIn(
-                                  xamanPayload.uuid,
-                                  xamanPayload.next?.always,
-                                )
-                              }
-                            >
-                              Open Xaman app
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-ghost"
-                              onClick={cancelXamanSignIn}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                          <p className="hint" style={{ margin: '8px 0 0', fontSize: 11 }}>
-                            Payload {xamanPayload.uuid.slice(0, 8)}…
-                          </p>
-                        </div>
-                      </div>
-                    ) : xamanStatus ? (
-                      <p className="hint" style={{ marginTop: 8, marginBottom: 0 }}>
-                        {xamanStatus}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <>
-                <p className="quote">
-                  Wallet{' '}
-                  <b>
-                    {walletAddr.slice(0, 8)}…{walletAddr.slice(-4)}
-                  </b>{' '}
-                  · {nftFighters.length} old-collection NFT
-                  {nftFighters.length === 1 ? '' : 's'}
-                  {nftProgress ? ` · ${nftProgress}` : ''}
-                  {nftFighters.length === 0 ? ' · no owned fighters yet' : ''}
-                </p>
-                <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={nftLoading}
-                    data-testid="refresh-old-collection"
-                    onClick={() => {
-                      unlockAudio()
-                      void refreshNfts(walletAddr)
-                    }}
-                  >
-                    {nftLoading ? 'Scanning…' : 'Rescan all old collection'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    data-testid="switch-wallet"
-                    onClick={() => {
-                      unlockAudio()
-                      sfx.ui()
-                      cancelXamanSignIn()
-                      setWalletAddr('')
-                      setNftFighters([])
-                      setStarterFighter(null)
-                      clearCachedMyHandle()
-                      setMyHandle(null)
-                      disconnectFighterWallet()
-                      setShowConnectPanel(true)
-                      showToast('Choose Riddle Wallet or Xaman to reconnect')
-                    }}
-                  >
-                    Switch wallet
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={onDisconnectWallet}
-                  >
-                    Disconnect
-                  </button>
-                </div>
-                {!nftLoading && roster.length === 0 ? (
-                  <div style={{ marginTop: 12 }}>
-                    <p className="hint">
-                      No fightable NFTs on this wallet <strong>on the XRPL ledger</strong>. Free
-                      Basic Human: server mints to a Destination-locked 0-XRP offer, then you{' '}
-                      <strong>sign one AcceptOffer</strong> in Riddle Wallet (network fee only — not
-                      a payment). Soft local fakes are never shown as owned.
-                    </p>
-                  </div>
-                ) : null}
-                {/* Always show open mint pack when wallet connected */}
-                <div
-                  className="panel"
-                  style={{
-                    marginTop: 14,
-                    padding: 12,
-                    borderRadius: 12,
-                    border: '1px solid #2a2a3a',
-                    background: '#0e0e16',
-                  }}
-                  data-testid="open-mint-pack"
-                >
-                  <h3 className="g-panel-title" style={{ fontSize: 14, margin: '0 0 6px' }}>
-                    Open mint
-                  </h3>
-                  <p className="hint" style={{ marginTop: 0 }}>
-                    Use your <strong>personal</strong> wallet (never the game mint). Free mint =
-                    one AcceptOffer · NFT price 0 XRP · network fee only
-                  </p>
-                  <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                    {canOfferFreeMint ? (
-                      <button
-                        type="button"
-                        className="btn btn-ok"
-                        data-testid="mint-free-basic-human"
-                        disabled={mintBusy}
-                        onClick={() => void onMintFreeBasicHuman()}
-                      >
-                        {mintBusy ? 'Signing…' : 'Free Basic Human (1×)'}
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="btn"
-                      data-testid="mint-bh-150"
-                      disabled={mintBusy}
-                      onClick={() => onMintPaid('basic-human')}
-                    >
-                      Extra Basic Human · {MINT_PRICE_BASIC_HUMAN_EXTRA} cr
-                    </button>
-                    <button
-                      type="button"
-                      className="btn"
-                      data-testid="mint-reborn-200"
-                      disabled={mintBusy}
-                      onClick={() => onMintPaid('reborn')}
-                    >
-                      Mint Reborn · {MINT_PRICE_REBORN} cr
-                    </button>
-                    <a className="btn btn-ghost" href={cafeBuyNftUrl()}>
-                      Buy on Cafe
-                    </a>
-                  </div>
-                </div>
-              </>
-            )}
-          </section>
-
-          {!walletAddr ? (
-            <section className="panel g-panel" id="free-mint">
-              <h2 className="g-panel-title">Open mint</h2>
-              <p className="hint">
-                Connect wallet to mint free Basic Human (1×), extra BH for{' '}
-                <strong>{MINT_PRICE_BASIC_HUMAN_EXTRA} credits</strong>, or Reborn for{' '}
-                <strong>{MINT_PRICE_REBORN} credits</strong>. On-chain Accept required.
-              </p>
-              <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                <button
-                  type="button"
-                  className="btn btn-ok"
-                  data-testid="mint-free-basic-human-guest"
-                  onClick={() => {
-                    unlockAudio()
-                    sfx.ui()
-                    onConnectRiddle()
-                  }}
-                >
-                  Connect wallet to mint
-                </button>
-              </div>
-            </section>
-          ) : null}
-
-          <FighterPicker
-            title={
-              roster.length > 0
-                ? `Your owned fighters (${roster.length})`
-                : 'Your owned fighters'
-            }
-            fighters={roster}
-            selectedId={selected?.id}
-            onSelect={(f) => {
-              if (f.source === 'demo' || String(f.id || '').startsWith('cpu-')) {
-                showToast('Fake NFTs are not allowed — use an NFT you own')
-                return
-              }
-              if (f.fightable === false) {
-                showToast('That card is catalog-only — pick a fightable owned NFT')
-                return
-              }
-              setSelected(f)
-              sfx.select()
+            if (credits < need) {
               showToast(
-                isStarterHumanFighter(f)
-                  ? `Selected on-chain Basic Human · ${f.name}`
-                  : `Selected owned NFT · ${f.name}`,
+                `Need ${formatCredits(need)} · balance ${formatCredits(credits)}. Top up in Wallet.`,
               )
-            }}
-            onView={openNftDetail}
-            loading={nftLoading && Boolean(walletAddr)}
-            emptyHint={
-              nftLoading
-                ? 'Loading your NFTs…'
-                : walletAddr
-                  ? 'No owned fightable NFTs — mint free Basic Human or buy on Cafe'
-                  : 'Connect wallet to load the NFTs you own'
+              return
             }
-            showCafeCta={!nftLoading && walletAddr !== '' && roster.length === 0}
-            fightSelectOnly={false}
-            defaultTab="fightable"
-            creditBalance={credits}
-          />
-          {selected ? (
-            <div className="row" style={{ marginTop: -4, flexWrap: 'wrap', gap: 8 }}>
-              {selected.source === 'nft' || selected.nftId ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => openNftDetail(selected)}
-                >
-                  View {selected.name} detail
-                </button>
-              ) : null}
-              <span className="chip">
-                Owned · HP {selected.stats.hp} · ATK {selected.stats.atk}
-                {selected.nftId ? ` · ${selected.nftId.slice(0, 8)}…` : ''}
-              </span>
-              {playMode === 'cpu' ? (
-                <button
-                  type="button"
-                  className="btn btn-ok btn-sm"
-                  data-testid="fight-cpu-selected"
-                  onClick={() => {
-                    unlockAudio()
-                    sfx.ui()
-                    startLocalFight('cpu')
-                  }}
-                >
-                  Fight CPU with this NFT
-                </button>
-              ) : null}
-            </div>
-          ) : (
-            <p className="hint" style={{ marginTop: -4 }}>
-              {walletAddr
-                ? 'Select an owned fightable NFT above to Fight CPU.'
-                : 'Connect your wallet to fight with NFTs you own. No fake demos.'}
-            </p>
-          )}
-
-          {playMode === 'local2p' ? (
-            <FighterPicker
-              title="P2 fighter (owned NFT)"
-              fighters={roster}
-              selectedId={p2Fighter?.id}
-              onSelect={(f) => {
-                if (f.fightable === false || f.source === 'demo') return
-                setP2Fighter(f)
-                sfx.select()
+            if (playMode === 'cpu') startLocalFight('cpu')
+            else if (playMode === 'local2p') startLocalFight('local2p')
+            else showToast('Scroll down — finish host/join, bracket, or offer setup')
+          }}
+          fightDisabled={playMode === 'cpu' && roster.length === 0}
+          roster={roster}
+          selected={selected}
+          p2Fighter={p2Fighter}
+          onSelectFighter={(f) => {
+            if (f.source === 'demo' || String(f.id || '').startsWith('cpu-')) {
+              showToast('Fake NFTs are not allowed — use an NFT you own')
+              return
+            }
+            if (f.fightable === false) {
+              showToast('That card is catalog-only — pick a fightable owned NFT')
+              return
+            }
+            setSelected(f)
+            sfx.select()
+            showToast(
+              isStarterHumanFighter(f)
+                ? `Selected on-chain Basic Human · ${f.name}`
+                : `Selected owned NFT · ${f.name}`,
+            )
+          }}
+          onSelectP2={(f) => {
+            if (f.fightable === false || f.source === 'demo') return
+            setP2Fighter(f)
+            sfx.select()
+          }}
+          onViewFighter={openNftDetail}
+          nftLoading={nftLoading}
+          walletConnected={Boolean(walletAddr)}
+          funMeta={funMeta}
+          scores={scores}
+          myHandle={myHandle}
+          myHandleLoading={myHandleLoading}
+          handleGateOpen={handleGateOpen}
+          walletAddr={walletAddr}
+          onRefreshMyHandle={async () => {
+            if (!walletAddr) {
+              showToast('Connect a wallet first')
+              return
+            }
+            const rec = await refreshMyHandle(walletAddr)
+            if (rec) showToast(`Handle ready · ${formatHandle(rec.handle)}`)
+            else showToast('Still no handle — finish claim on Social, then Refresh')
+          }}
+          onHandleUiClick={() => unlockAudio()}
+          onFightCpuSelected={() => {
+            unlockAudio()
+            sfx.ui()
+            startLocalFight('cpu')
+          }}
+          walletSection={
+            <WalletConnectPanel
+              session={{
+                address: walletAddr || null,
+                nftCount: nftFighters.length,
+                nftProgress: nftProgress || undefined,
+                nftLoading,
+                rosterEmpty: roster.length === 0,
               }}
-              emptyHint="Need a second owned NFT for local 2P"
-              fightSelectOnly={true}
-              defaultTab="fightable"
+              connectBusy={connectBusy}
+              showDetails={false}
+              onToggleDetails={() => setShowConnectPanel((v) => !v)}
+              xaman={{
+                payload: xamanPayload,
+                status: xamanStatus,
+                ready: xamanReady,
+              }}
+              onConnectRiddle={() => onConnectRiddle()}
+              onConnectXaman={() => void onConnectXaman()}
+              onCancelXaman={cancelXamanSignIn}
+              onRescan={() => {
+                if (walletAddr) void refreshNfts(walletAddr)
+              }}
+              onSwitchWallet={() => {
+                cancelXamanSignIn()
+                setWalletAddr('')
+                setNftFighters([])
+                setStarterFighter(null)
+                clearCachedMyHandle()
+                setMyHandle(null)
+                disconnectFighterWallet()
+                setShowConnectPanel(true)
+                showToast('Choose Riddle Wallet or Xaman to reconnect')
+              }}
+              onDisconnect={onDisconnectWallet}
+              mint={{
+                canOfferFree: canOfferFreeMint,
+                busy: mintBusy,
+                onFreeBasicHuman: () => void onMintFreeBasicHuman(),
+                onPaidBasicHuman: () => onMintPaid('basic-human'),
+                onPaidReborn: () => onMintPaid('reborn'),
+              }}
+              showXamanModal={false}
             />
-          ) : null}
-
-          {selected ? <MovesLegend fighter={selected} /> : null}
-
-          <section className="panel">
-            <h2>Match settings</h2>
-            <div className="row">
-              <div className="field">
-                <label htmlFor="rounds">Rounds to win</label>
-                <select
-                  id="rounds"
-                  value={roundsToWin}
-                  onChange={(e) => setRoundsToWin(Number(e.target.value) || 2)}
-                >
-                  <option value={1}>First to 1</option>
-                  <option value={2}>First to 2 (best of 3)</option>
-                  <option value={3}>First to 3 (best of 5)</option>
-                </select>
-              </div>
-            </div>
-            <p className="hint" style={{ marginTop: 8 }}>
-              Every fight costs <strong>{BATTLE_ENTRY_FEE} cr entry</strong> (winner pot{' '}
-              {BATTLE_ENTRY_FEE * 2} cr). Optional match wager is extra. Tournament entry default{' '}
-              {TOURNAMENT_ENTRY_FEE} cr · 80% prize pool to champion. Top up in Wallet if short.
-            </p>
-            <div className="row" style={{ marginTop: 10 }} data-agent-pilot="1">
+          }
+          pilotControls={
+            <>
               <label className="chip" style={{ cursor: 'pointer' }}>
                 <input
                   type="checkbox"
@@ -2443,7 +2141,6 @@ export default function App() {
                     className="btn btn-ghost btn-sm"
                     onClick={() => {
                       const key = online?.roomCode || playMode
-                      // Other human must also accept
                       const ok = window.confirm(
                         'Other player: agree that AI may pilot a fighter this match?\nBoth humans must accept.',
                       )
@@ -2453,409 +2150,587 @@ export default function App() {
                   >
                     Other player accept
                   </button>
-                  <span className="hint">
-                    {
-                      canRfPilot(online?.roomCode || playMode, true).message
-                    }
-                  </span>
+                  <span className="hint">{canRfPilot(online?.roomCode || playMode, true).message}</span>
                 </>
               ) : null}
-            </div>
-            {pilot.enabled ? (
-              <p className="quote">
-                Pilot on · vs CPU free · vs human <b>both must agree</b>
-              </p>
-            ) : null}
-            <div className="row">
-              <label className="chip" style={{ cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={wagerOn}
-                  onChange={(e) => setWagerOn(e.target.checked)}
-                  style={{ marginRight: 6 }}
-                />
-                Match wager
-              </label>
-              <div className="field">
-                <label htmlFor="stake">Stake (cr each)</label>
-                <input
-                  id="stake"
-                  type="number"
-                  min={MIN_WAGER_CREDITS}
-                  value={stake}
-                  disabled={!wagerOn}
-                  onChange={(e) => setStake(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                />
-              </div>
-            </div>
-            <p className="quote">
-              Battle entry <b>{BATTLE_ENTRY_FEE} cr</b> · win pot <b>{BATTLE_ENTRY_FEE * 2} cr</b>
-              {wagerOn
-                ? ` · extra wager pot ${quote.pot} · 10% cut ${quote.platformCut} · wager win ${quote.winnerPayout} cr`
-                : ' · optional wager off'}
-            </p>
-          </section>
-
-          {playMode === 'cpu' && (
-            <section className="panel" data-owned-cpu="1">
-              <h2>Vs computer</h2>
-              <p className="hint">
-                Fight with an <strong>NFT you own</strong> only. CPU is a scaled mirror/rival of your
-                real NFT art — no hardcoded fighters.
-              </p>
-              <div className="field" style={{ marginBottom: 10 }}>
-                <label>Difficulty</label>
-                <div className="row" style={{ flexWrap: 'wrap', gap: 8 }} data-testid="difficulty-row">
-                  {DIFFICULTIES.map((d) => (
+              {pilot.enabled ? (
+                <p className="quote" style={{ width: '100%', margin: 0 }}>
+                  Pilot on · vs CPU free · vs human <b>both must agree</b>
+                </p>
+              ) : null}
+            </>
+          }
+          modeSection={
+            <>
+              {playMode === 'cpu' && (
+                <section className="panel" data-owned-cpu="1">
+                  <h2>Vs computer</h2>
+                  <p className="hint">
+                    Fight with an <strong>NFT you own</strong> only. CPU is a scaled mirror/rival of your
+                    real NFT art — no hardcoded fighters.
+                  </p>
+                  <div className="field" style={{ marginBottom: 10 }}>
+                    <label>Difficulty</label>
+                    <div className="row" style={{ flexWrap: 'wrap', gap: 8 }} data-testid="difficulty-row">
+                      {DIFFICULTIES.map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          className={difficulty === d.id ? 'btn btn-ok' : 'btn btn-ghost'}
+                          data-testid={`difficulty-${d.id}`}
+                          onClick={() => {
+                            unlockAudio()
+                            sfx.ui()
+                            setDifficulty(d.id)
+                            saveDifficulty(d.id)
+                            showToast(`${d.label} · ${d.hint}`)
+                          }}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="hint" style={{ marginTop: 6 }}>
+                      {DIFFICULTIES.find((d) => d.id === difficulty)?.hint || 'Easy'}
+                    </p>
+                  </div>
+                  <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
                     <button
-                      key={d.id}
                       type="button"
-                      className={difficulty === d.id ? 'btn btn-ok' : 'btn btn-ghost'}
-                      data-testid={`difficulty-${d.id}`}
+                      className="btn btn-ok"
+                      data-testid="fight-cpu"
+                      disabled={!selected || selected.source === 'demo'}
                       onClick={() => {
                         unlockAudio()
                         sfx.ui()
-                        setDifficulty(d.id)
-                        saveDifficulty(d.id)
-                        showToast(`${d.label} · ${d.hint}`)
+                        startLocalFight('cpu')
                       }}
                     >
-                      {d.label}
+                      Fight CPU · {DIFFICULTIES.find((d) => d.id === difficulty)?.label || 'Easy'}
                     </button>
-                  ))}
-                </div>
-                <p className="hint" style={{ marginTop: 6 }}>
-                  {DIFFICULTIES.find((d) => d.id === difficulty)?.hint || 'Easy'}
-                </p>
-              </div>
-              <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                <button
-                  type="button"
-                  className="btn btn-ok"
-                  data-testid="fight-cpu"
-                  disabled={!selected || selected.source === 'demo'}
-                  onClick={() => {
-                    unlockAudio()
-                    sfx.ui()
-                    startLocalFight('cpu')
-                  }}
-                >
-                  Fight CPU · {DIFFICULTIES.find((d) => d.id === difficulty)?.label || 'Easy'}
-                </button>
-              </div>
-              <div className="row" style={{ marginTop: 10 }}>
-                <div className="field">
-                  <label htmlFor="handle">Or challenge @handle (AI stand-in)</label>
-                  <input
-                    id="handle"
-                    value={handle}
-                    placeholder="riddle"
-                    onChange={(e) => setHandle(e.target.value)}
-                  />
-                </div>
-                <button type="button" className="btn btn-ghost" onClick={() => void onLookupHandle()}>
-                  Lookup
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={!selected}
-                  onClick={() => startLocalFight('handle')}
-                >
-                  Fight handle
-                </button>
-              </div>
-              {handleStatus ? <p className="quote">{handleStatus}</p> : null}
-              {resolvedHandle ? (
-                <p className="quote">
-                  Invite:{' '}
-                  <a href={challengeUrl(resolvedHandle)} style={{ color: 'var(--cyan)' }}>
-                    {challengeUrl(resolvedHandle)}
-                  </a>
-                </p>
-              ) : null}
-            </section>
-          )}
-
-          {playMode === 'local2p' && (
-            <section className="panel">
-              <h2>Local multiplayer</h2>
-              <p className="hint">Same phone/tablet — dual touch pads. Optional wager from P1 credits.</p>
-              <button
-                type="button"
-                className="btn btn-ok"
-                disabled={!selected || roster.length < 2}
-                onClick={() => startLocalFight('local2p')}
-              >
-                Start local 2P
-              </button>
-            </section>
-          )}
-
-          {playMode === 'online' && (
-            <section className="panel">
-              <h2>Online multiplayer</h2>
-              <p className="hint">
-                Host creates a room code. Friend opens fighter.riddlewallet.com and joins. Host runs
-                the match; guest inputs sync live (PeerJS).
-              </p>
-              <div className="row">
-                <button
-                  type="button"
-                  className="btn btn-ok"
-                  disabled={!selected || onlineBusy}
-                  title={
-                    !selected
-                      ? 'Select an owned fighter before hosting a room'
-                      : onlineBusy
-                        ? 'Working…'
-                        : 'Host multiplayer room'
-                  }
-                  onClick={() => void startHost()}
-                >
-                  Host room
-                </button>
-              </div>
-              {online?.roomCode ? (
-                <div style={{ marginTop: 10 }}>
-                  <div className="code-box">{online.roomCode}</div>
-                  <p className="quote">
-                    Status: <b>{online.status}</b>
-                    {online.error ? ` · ${online.error}` : ''}
-                  </p>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => {
-                      void navigator.clipboard?.writeText(roomShareUrl(online.roomCode))
-                      showToast('Link copied')
-                    }}
-                  >
-                    Copy invite link
-                  </button>
-                </div>
-              ) : null}
-              <div className="row" style={{ marginTop: 12 }}>
-                <div className="field">
-                  <label htmlFor="join">Join code</label>
-                  <input
-                    id="join"
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value)}
-                    placeholder="rf……"
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={onlineBusy}
-                  onClick={() => void startJoin()}
-                >
-                  Join
-                </button>
-              </div>
-            </section>
-          )}
-
-          {playMode === 'tournament' && (
-            <section className="panel">
-              <h2>Tournament setup</h2>
-              <p className="hint">
-                Single-elim bracket. Entry locks from suite credits (default {TOURNAMENT_ENTRY_FEE}{' '}
-                cr). CPU fills empty seats. Champion takes <strong>80%</strong> of the entry pool.
-              </p>
-              <div className="row">
-                <div className="field">
-                  <label htmlFor="tsize">Size</label>
-                  <select
-                    id="tsize"
-                    value={tSize}
-                    onChange={(e) => setTSize(Number(e.target.value) as TourneySize)}
-                  >
-                    <option value={4}>4 players</option>
-                    <option value={8}>8 players</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="tentry">Entry (credits)</label>
-                  <input
-                    id="tentry"
-                    type="number"
-                    min={0}
-                    value={tEntry}
-                    onChange={(e) => setTEntry(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                  />
-                </div>
-              </div>
-              <p className="quote">{potLine(tEntry, tSize)}</p>
-              <div className="field">
-                <label htmlFor="th">Optional @handles (comma) for seats</label>
-                <input
-                  id="th"
-                  value={tHandles}
-                  onChange={(e) => setTHandles(e.target.value)}
-                  placeholder="alice, bob"
-                />
-              </div>
-              <div className="row" style={{ marginTop: 10 }}>
-                <button type="button" className="btn btn-ok" onClick={setupTourney}>
-                  Build bracket
-                </button>
-                {tourney ? (
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => {
-                      setScreen('tourney')
-                    }}
-                  >
-                    Open current
-                  </button>
-                ) : null}
-              </div>
-            </section>
-          )}
-
-          {playMode === 'offer' && (
-            <section className="panel">
-              <h2>Create fight offer</h2>
-              <p className="hint">
-                Offer a fight using <strong>your selected NFT</strong>. Share the link — opponent
-                picks their NFT to accept. Optional suite-credit stake.
-              </p>
-              <div className="row">
-                <div
-                  className="swatch nft-swatch"
-                  style={{
-                    width: 72,
-                    height: 72,
-                    flexShrink: 0,
-                    ...(selected?.image
-                      ? {
-                          backgroundImage: `url(${selected.image})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                        }
-                      : {
-                          background: `#12121a`,
-                        }),
-                  }}
-                />
-                <div>
-                  <b>{selected?.name || 'Pick an owned NFT'}</b>
-                  <p className="quote" style={{ margin: '4px 0 0' }}>
-                    {selected ? 'Owned NFT' : 'No fighter'} · stake{' '}
-                    {wagerOn ? `${stake} cr` : 'free'} · FT{roundsToWin}
-                  </p>
-                </div>
-              </div>
-              <div className="field" style={{ marginTop: 8 }}>
-                <label htmlFor="omsg">Message (optional)</label>
-                <input
-                  id="omsg"
-                  value={offerMsg}
-                  onChange={(e) => setOfferMsg(e.target.value)}
-                  placeholder="1v1 me · NFT vs NFT"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="oh">Target @handle (optional)</label>
-                <input
-                  id="oh"
-                  value={handle}
-                  onChange={(e) => setHandle(e.target.value)}
-                  placeholder="rival"
-                />
-              </div>
-              <div className="row" style={{ marginTop: 10 }}>
-                <button type="button" className="btn btn-ok" onClick={createOffer}>
-                  Create offer · copy link
-                </button>
-              </div>
-              {lastOfferLink ? (
-                <p className="quote" style={{ wordBreak: 'break-all' }}>
-                  Share: <a href={lastOfferLink} style={{ color: 'var(--cyan)' }}>{lastOfferLink}</a>
-                </p>
-              ) : null}
-              <h2 style={{ marginTop: 14 }}>Your offers</h2>
-              <ul className="history">
-                {offers.length === 0 ? (
-                  <li style={{ justifyContent: 'center', opacity: 0.6 }}>No offers yet</li>
-                ) : (
-                  offers.slice(0, 8).map((o) => (
-                    <li key={o.id}>
-                      <span>
-                        {o.challenger.name} · {o.stakeCredits ? `${o.stakeCredits} cr` : 'free'} ·{' '}
-                        {o.status}
-                      </span>
-                      <span className="row">
-                        {o.status === 'open' ? (
-                          <>
-                            <button
-                              type="button"
-                              className="btn btn-ghost"
-                              style={{ minHeight: 32, padding: '4px 8px' }}
-                              onClick={() => {
-                                const link = offerShareUrl(o)
-                                void navigator.clipboard?.writeText(link)
-                                showToast('Link copied')
-                              }}
-                            >
-                              Copy
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-danger"
-                              style={{ minHeight: 32, padding: '4px 8px' }}
-                              onClick={() => {
-                                cancelOffer(o.id)
-                                setOffers(listOffers())
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : null}
-                      </span>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </section>
-          )}
-
-          <section className="panel g-panel">
-            <h2 className="g-panel-title">Your record</h2>
-            <p className="hint">
-              {scoreRecordLabel(scores)} · streak {scores.streak} · wagered {scores.totalWagered} cr
-            </p>
-            <ul className="history">
-              {scores.history.length === 0 ? (
-                <li style={{ justifyContent: 'center', opacity: 0.6 }}>No matches yet</li>
-              ) : (
-                scores.history.slice(0, 12).map((h) => (
-                  <li key={h.id}>
-                    <span>
-                      <span className={h.won ? 'won' : 'lost'}>{h.won ? 'WIN' : 'LOSS'}</span>{' '}
-                      {h.fighterName} vs {h.opponent}
-                    </span>
-                    <span style={{ color: 'var(--muted)' }}>
-                      {h.wagerCredits ? `${h.wagerCredits} cr` : 'spar'}
-                    </span>
-                  </li>
-                ))
+                  </div>
+                  <div className="row" style={{ marginTop: 10 }}>
+                    <div className="field">
+                      <label htmlFor="handle">Or challenge @handle (AI stand-in)</label>
+                      <input
+                        id="handle"
+                        value={handle}
+                        placeholder="riddle"
+                        onChange={(e) => setHandle(e.target.value)}
+                      />
+                    </div>
+                    <button type="button" className="btn btn-ghost" onClick={() => void onLookupHandle()}>
+                      Lookup
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={!selected}
+                      onClick={() => startLocalFight('handle')}
+                    >
+                      Fight handle
+                    </button>
+                  </div>
+                  {handleStatus ? <p className="quote">{handleStatus}</p> : null}
+                  {resolvedHandle ? (
+                    <p className="quote">
+                      Invite:{' '}
+                      <a href={challengeUrl(resolvedHandle)} style={{ color: 'var(--cyan)' }}>
+                        {challengeUrl(resolvedHandle)}
+                      </a>
+                    </p>
+                  ) : null}
+                </section>
               )}
-            </ul>
-          </section>
-        </div>
+
+              {playMode === 'local2p' && (
+                <section className="panel">
+                  <h2>Local multiplayer</h2>
+                  <p className="hint">Same phone/tablet — dual touch pads. Optional wager from P1 credits.</p>
+                  <button
+                    type="button"
+                    className="btn btn-ok"
+                    disabled={!selected || roster.length < 2}
+                    onClick={() => startLocalFight('local2p')}
+                  >
+                    Start local 2P
+                  </button>
+                </section>
+              )}
+
+              {playMode === 'online' && (
+                <section className="panel">
+                  <h2>Online multiplayer</h2>
+                  <p className="hint">
+                    Host creates a room code. Friend opens fighter.riddlewallet.com and joins. Host runs
+                    the match; guest inputs sync live (PeerJS).
+                  </p>
+                  <div className="row">
+                    <button
+                      type="button"
+                      className="btn btn-ok"
+                      disabled={!selected || onlineBusy}
+                      title={
+                        !selected
+                          ? 'Select an owned fighter before hosting a room'
+                          : onlineBusy
+                            ? 'Working…'
+                            : 'Host multiplayer room'
+                      }
+                      onClick={() => void startHost()}
+                    >
+                      Host room
+                    </button>
+                  </div>
+                  {online?.roomCode ? (
+                    <div style={{ marginTop: 10 }}>
+                      <div className="code-box">{online.roomCode}</div>
+                      <p className="quote">
+                        Status: <b>{online.status}</b>
+                        {online.error ? ` · ${online.error}` : ''}
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => {
+                          void navigator.clipboard?.writeText(roomShareUrl(online.roomCode))
+                          showToast('Link copied')
+                        }}
+                      >
+                        Copy invite link
+                      </button>
+                    </div>
+                  ) : null}
+                  <div className="row" style={{ marginTop: 12 }}>
+                    <div className="field">
+                      <label htmlFor="join">Join code</label>
+                      <input
+                        id="join"
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value)}
+                        placeholder="rf……"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={onlineBusy}
+                      onClick={() => void startJoin()}
+                    >
+                      Join
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {playMode === 'tournament' && (
+                <section className="panel fd-tourney-setup" data-testid="tourney-setup">
+                  <h2>Tournament setup</h2>
+                  <p className="hint">
+                    Build a single-elim cup with <strong>entry fees</strong>, prize pool, schedule,
+                    Civ banners, and NFT fighters. Empty seats fill with themed CPU rivals. Champion
+                    takes the prize pool (suite credits).
+                  </p>
+                  <div className="field">
+                    <label htmlFor="tname">Cup name</label>
+                    <input
+                      id="tname"
+                      value={tName}
+                      onChange={(e) => setTName(e.target.value)}
+                      placeholder="Civ Banner Cup · NFT Invitational"
+                    />
+                  </div>
+                  <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                    <div className="field">
+                      <label htmlFor="ttheme">Theme</label>
+                      <select
+                        id="ttheme"
+                        value={tTheme}
+                        onChange={(e) => setTTheme(e.target.value as TourneyTheme)}
+                      >
+                        <option value="open">Open fighter</option>
+                        <option value="civ">Civilisations</option>
+                        <option value="nft">NFT games</option>
+                        <option value="mixed">Mixed realm</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="tsize">Bracket size</label>
+                      <select
+                        id="tsize"
+                        value={tSize}
+                        onChange={(e) => setTSize(Number(e.target.value) as TourneySize)}
+                      >
+                        <option value={4}>4 players</option>
+                        <option value={8}>8 players</option>
+                        <option value={16}>16 players</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="tentry">Entry fee (credits)</label>
+                      <input
+                        id="tentry"
+                        type="number"
+                        min={0}
+                        step={5}
+                        value={tEntry}
+                        onChange={(e) =>
+                          setTEntry(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                        }
+                      />
+                    </div>
+                  </div>
+                  {(() => {
+                    const q = quoteTournament(tSize, tEntry)
+                    return (
+                      <div className="fd-tourney-quote" data-testid="tourney-pool-quote">
+                        <div>
+                          <span>Your entry</span>
+                          <b>{q.entryCredits} cr</b>
+                        </div>
+                        <div>
+                          <span>Full pot</span>
+                          <b>{q.pot} cr</b>
+                        </div>
+                        <div>
+                          <span>Champion prize</span>
+                          <b>{q.winnerPayout} cr</b>
+                        </div>
+                        <div>
+                          <span>Platform cut</span>
+                          <b>{q.platformCut} cr</b>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  <p className="quote">{potLine(tEntry, tSize)}</p>
+                  <div className="field">
+                    <label htmlFor="twhen">Start time (optional)</label>
+                    <input
+                      id="twhen"
+                      type="datetime-local"
+                      value={tStartsLocal}
+                      onChange={(e) => setTStartsLocal(e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="th">
+                      Seats · @handles or civ:Name (comma / new lines)
+                    </label>
+                    <textarea
+                      id="th"
+                      value={tHandles}
+                      onChange={(e) => setTHandles(e.target.value)}
+                      placeholder={'alice, bob\nciv:Iron League\nciv:Void Court'}
+                      rows={3}
+                      style={{ width: '100%', resize: 'vertical' }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="tdesc">Description</label>
+                    <input
+                      id="tdesc"
+                      value={tDesc}
+                      onChange={(e) => setTDesc(e.target.value)}
+                      placeholder="Winner takes the realm pot · NFT only"
+                    />
+                  </div>
+                  <div className="row" style={{ marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn-ok"
+                      data-testid="tourney-build"
+                      onClick={setupTourney}
+                    >
+                      Build tournament
+                    </button>
+                    {tourney ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setScreen('tourney')}
+                      >
+                        Open bracket
+                      </button>
+                    ) : null}
+                    <a className="btn btn-ghost" href={SUITE.civ} target="_blank" rel="noreferrer">
+                      Open Civ
+                    </a>
+                  </div>
+                </section>
+              )}
+
+              {playMode === 'offer' && (
+                <section className="panel fd-wager-panel" data-testid="fight-offer-panel">
+                  <h2>Challenge · wager · schedule</h2>
+                  <p className="hint">
+                    Offer <strong>your selected NFT</strong> as the challenger. Lock suite-credit
+                    wagers, challenge Civ / @handle, fight <strong>immediately</strong> on accept or
+                    set a time.
+                  </p>
+                  <div className="row">
+                    <div
+                      className="swatch nft-swatch"
+                      style={{
+                        width: 72,
+                        height: 72,
+                        flexShrink: 0,
+                        ...(selected?.image
+                          ? {
+                              backgroundImage: `url(${selected.image})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                            }
+                          : { background: `#12121a` }),
+                      }}
+                    />
+                    <div>
+                      <b>{selected?.name || 'Pick an owned NFT'}</b>
+                      <p className="quote" style={{ margin: '4px 0 0' }}>
+                        Challenger NFT · balance {formatCredits(credits)} · FT{roundsToWin}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
+                    <label className="chip" style={{ cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={wagerOn}
+                        onChange={(e) => setWagerOn(e.target.checked)}
+                        style={{ marginRight: 6 }}
+                      />
+                      Credit wager
+                    </label>
+                    <div className="field" style={{ minWidth: 120 }}>
+                      <label htmlFor="offer-stake">Stake each (cr)</label>
+                      <input
+                        id="offer-stake"
+                        type="number"
+                        min={MIN_WAGER_CREDITS}
+                        value={stake}
+                        disabled={!wagerOn}
+                        onChange={(e) =>
+                          setStake(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                        }
+                      />
+                    </div>
+                  </div>
+                  {wagerOn ? (
+                    <p className="quote">
+                      Lock <b>{stake} cr</b> now · pot {quote.pot} · platform cut {quote.platformCut}{' '}
+                      · winner {quote.winnerPayout} cr · + {BATTLE_ENTRY_FEE} cr entry each at fight
+                    </p>
+                  ) : (
+                    <p className="quote">No wager · entry still {BATTLE_ENTRY_FEE} cr when fight starts</p>
+                  )}
+
+                  <div className="field" style={{ marginTop: 8 }}>
+                    <label htmlFor="offer-target">Challenge target</label>
+                    <select
+                      id="offer-target"
+                      value={offerTargetKind}
+                      onChange={(e) =>
+                        setOfferTargetKind(e.target.value as FightTargetKind)
+                      }
+                    >
+                      <option value="open">Open link (anyone)</option>
+                      <option value="handle">@handle rival</option>
+                      <option value="civ">Civilisation / Civ</option>
+                    </select>
+                  </div>
+                  {(offerTargetKind === 'handle' || offerTargetKind === 'civ') && (
+                    <div className="field">
+                      <label htmlFor="oh">
+                        {offerTargetKind === 'civ' ? 'Civ / @handle' : 'Target @handle'}
+                      </label>
+                      <input
+                        id="oh"
+                        value={handle}
+                        onChange={(e) => setHandle(e.target.value)}
+                        placeholder={offerTargetKind === 'civ' ? 'civ leader or @handle' : 'rival'}
+                      />
+                    </div>
+                  )}
+
+                  <div className="field" style={{ marginTop: 8 }}>
+                    <label htmlFor="offer-when">When</label>
+                    <select
+                      id="offer-when"
+                      value={offerStartMode}
+                      onChange={(e) =>
+                        setOfferStartMode(e.target.value as FightStartMode)
+                      }
+                    >
+                      <option value="immediate">Immediate fight (on accept)</option>
+                      <option value="scheduled">Schedule a time</option>
+                    </select>
+                  </div>
+                  {offerStartMode === 'scheduled' ? (
+                    <div className="field">
+                      <label htmlFor="offer-at">Fight time</label>
+                      <input
+                        id="offer-at"
+                        type="datetime-local"
+                        value={offerScheduleLocal}
+                        onChange={(e) => setOfferScheduleLocal(e.target.value)}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="field" style={{ marginTop: 8 }}>
+                    <label htmlFor="omsg">Message</label>
+                    <input
+                      id="omsg"
+                      value={offerMsg}
+                      onChange={(e) => setOfferMsg(e.target.value)}
+                      placeholder="1v1 · your NFT vs mine"
+                    />
+                  </div>
+
+                  <div className="row" style={{ marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn-ok"
+                      data-testid="create-fight-offer"
+                      disabled={!selected}
+                      onClick={() => {
+                        setOfferStartMode('immediate')
+                        createOffer()
+                      }}
+                    >
+                      {wagerOn
+                        ? `Challenge now · lock ${stake} cr`
+                        : 'Challenge · immediate'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={!selected || offerStartMode !== 'scheduled'}
+                      onClick={() => createOffer()}
+                    >
+                      Schedule challenge
+                    </button>
+                  </div>
+
+                  {lastOfferLink ? (
+                    <div style={{ marginTop: 12 }}>
+                      <p className="quote" style={{ wordBreak: 'break-all' }}>
+                        Fighter link:{' '}
+                        <a href={lastOfferLink} style={{ color: 'var(--cyan)' }}>
+                          {lastOfferLink}
+                        </a>
+                      </p>
+                      {offerCivLink ? (
+                        <p className="quote" style={{ wordBreak: 'break-all' }}>
+                          Civ challenge:{' '}
+                          <a href={offerCivLink} style={{ color: 'var(--cyan)' }}>
+                            {offerCivLink}
+                          </a>
+                        </p>
+                      ) : null}
+                      <div className="row" style={{ gap: 8, marginTop: 6 }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            void navigator.clipboard?.writeText(lastOfferLink)
+                            showToast('Fighter link copied')
+                          }}
+                        >
+                          Copy fighter link
+                        </button>
+                        {offerCivLink ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => {
+                              void navigator.clipboard?.writeText(offerCivLink)
+                              showToast('Civ challenge link copied')
+                            }}
+                          >
+                            Copy Civ link
+                          </button>
+                        ) : null}
+                        <a className="btn btn-ghost btn-sm" href={SUITE.civ}>
+                          Open Civ
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <h2 style={{ marginTop: 16 }}>Your offers</h2>
+                  <ul className="history">
+                    {offers.length === 0 ? (
+                      <li style={{ justifyContent: 'center', opacity: 0.6 }}>No offers yet</li>
+                    ) : (
+                      offers.slice(0, 10).map((o) => (
+                        <li key={o.id}>
+                          <span>
+                            {o.challenger.name} ·{' '}
+                            {o.stakeCredits ? `${o.stakeCredits} cr` : 'free'} ·{' '}
+                            {formatScheduleLabel(o)} · {o.status}
+                            {o.targetKind === 'civ' ? ' · CIV' : ''}
+                          </span>
+                          <span className="row">
+                            {o.status === 'open' || o.status === 'scheduled' ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  style={{ minHeight: 32, padding: '4px 8px' }}
+                                  onClick={() => {
+                                    const link = offerShareUrl(o)
+                                    void navigator.clipboard?.writeText(link)
+                                    showToast('Link copied')
+                                  }}
+                                >
+                                  Copy
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger"
+                                  style={{ minHeight: 32, padding: '4px 8px' }}
+                                  onClick={() => {
+                                    const cancelled = cancelOffer(o.id)
+                                    if (
+                                      cancelled?.challengerWagerLocked &&
+                                      cancelled.stakeCredits >= MIN_WAGER_CREDITS
+                                    ) {
+                                      refundWagerLock(
+                                        quoteWagerCredits(cancelled.stakeCredits),
+                                        cancelled.wagerRef,
+                                      )
+                                      refreshCredits()
+                                      showToast(
+                                        `Cancelled · refunded ${cancelled.stakeCredits} cr wager`,
+                                      )
+                                    }
+                                    setOffers(listOffers())
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : null}
+                          </span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </section>
+              )}
+            </>
+          }
+        />
       )}
 
       {screen === 'offer_inbox' && incomingOffer && (
-        <section className="panel">
-          <h2>Fight offer</h2>
+        <section className="panel" data-testid="fight-offer-inbox">
+          <h2>Incoming challenge</h2>
           <p className="hint">
-            Someone challenged you. Pick <strong>your NFT</strong> above (lobby) then accept. Their
-            NFT art is the opponent sprite.
+            Pick <strong>your NFT</strong>, match the credit wager, then fight. Immediate challenges
+            start now; scheduled ones unlock at the set time.
           </p>
           <div className="row">
             <div
@@ -2879,14 +2754,21 @@ export default function App() {
               <p className="quote">
                 from {incomingOffer.fromLabel}
                 {incomingOffer.toHandle ? ` · to @${incomingOffer.toHandle}` : ''}
+                {incomingOffer.targetKind === 'civ' ? ' · CIV challenge' : ''}
                 <br />
-                stake <b>{incomingOffer.stakeCredits || 0} cr</b> · first to {incomingOffer.roundsToWin}
+                wager <b>{incomingOffer.stakeCredits || 0} cr</b> each · first to{' '}
+                {incomingOffer.roundsToWin} · {formatScheduleLabel(incomingOffer)}
                 {incomingOffer.message ? (
                   <>
                     <br />“{incomingOffer.message}”
                   </>
                 ) : null}
               </p>
+              {scheduleCountdown > 0 ? (
+                <p className="quote" data-testid="schedule-countdown">
+                  Starts in {Math.ceil(scheduleCountdown / 1000)}s
+                </p>
+              ) : null}
             </div>
           </div>
           <FighterPicker
@@ -2898,15 +2780,31 @@ export default function App() {
             emptyHint="Connect wallet and load an owned NFT to accept"
             showCafeCta={Boolean(walletAddr && roster.length === 0)}
           />
-          <div className="row">
+          <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
             <button
               type="button"
               className="btn btn-ok"
               onClick={acceptIncoming}
               disabled={!selected}
+              data-testid="accept-fight-offer"
             >
-              Accept with {selected?.name || 'your NFT'}
+              {offerCanFightNow(incomingOffer)
+                ? `Accept & fight · ${incomingOffer.stakeCredits || 0} cr wager`
+                : `Accept (wait until ${formatScheduleLabel(incomingOffer)})`}
             </button>
+            {!offerCanFightNow(incomingOffer) &&
+            incomingOffer.status === 'accepted' ? (
+              <button
+                type="button"
+                className="btn btn-ok"
+                disabled={!selected || scheduleCountdown > 0}
+                onClick={startScheduledNow}
+              >
+                {scheduleCountdown > 0
+                  ? `Fight unlocks in ${Math.ceil(scheduleCountdown / 1000)}s`
+                  : 'Start scheduled fight'}
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn btn-ghost"
@@ -2922,83 +2820,37 @@ export default function App() {
       )}
 
       {screen === 'tourney' && tourney && (
-        <section className="panel">
-          <h2>Tournament · {tourney.size}p · {tourney.status}</h2>
-          <p className="quote">
-            Entry <b>{tourney.entryFee} cr</b> · pot <b>{tourney.pot}</b> · champ payout{' '}
-            <b>{tourney.winnerPayout} cr</b>
-            {entryLocked ? ' · entry locked' : ''}
-          </p>
-          <div className="bracket">
-            {tourney.bracket.map((m) => {
-              const a = getSeat(tourney, m.a)
-              const b = getSeat(tourney, m.b)
-              const cur = tourney.currentMatchId === m.id
-              return (
-                <div
-                  key={m.id}
-                  className={`bracket-row${cur ? ' current' : ''}${m.winnerId ? ' done' : ''}`}
-                >
-                  <span>
-                    <b>{m.label}</b>
-                    <br />
-                    {a?.label || 'TBD'} vs {b?.label || 'TBD'}
-                  </span>
-                  <span>
-                    {m.winnerId
-                      ? `W: ${getSeat(tourney, m.winnerId)?.label || '—'}`
-                      : cur
-                        ? 'NEXT'
-                        : '—'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-          <div className="row" style={{ marginTop: 12 }}>
-            {tourney.status === 'setup' || (tourney.status === 'live' && !entryLocked && tourney.entryFee > 0) ? (
-              <button type="button" className="btn btn-ok" onClick={lockTourneyAndStart}>
-                Lock entry & play
-              </button>
-            ) : null}
-            {tourney.status === 'live' && (entryLocked || tourney.entryFee === 0) ? (
-              <button type="button" className="btn btn-ok" onClick={() => playTourneyMatch()}>
-                Play next match
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => {
-                clearTournament()
-                setTourney(null)
-                setEntryLocked(false)
-                setScreen('lobby')
-              }}
-            >
-              Abandon tourney
-            </button>
-            <button type="button" className="btn btn-ghost" onClick={() => setScreen('lobby')}>
-              Lobby
-            </button>
-          </div>
-        </section>
+        <div className="med-lobby">
+          <TourneyBoard
+            tourney={tourney}
+            entryLocked={entryLocked}
+            onLockAndStart={lockTourneyAndStart}
+            onPlayNext={() => playTourneyMatch()}
+            onAbandon={() => {
+              clearTournament()
+              setTourney(null)
+              setEntryLocked(false)
+              setScreen('lobby')
+            }}
+            onLobby={() => setScreen('lobby')}
+          />
+        </div>
       )}
 
       {screen === 'fight' && p2Fighter && selected && (
-        <section className="panel g-panel g-fight-shell">
+        <section className="panel g-panel g-fight-shell med-arena-stage">
           <div className="g-fight-head g-fight-head-art">
             <div className="g-fight-side g-fight-side-p1">
               <div
                 className="g-fight-port"
                 style={{
-                  backgroundColor: '#12121c',
+                  backgroundColor: '#0e0c0a',
                   backgroundImage: selected.image
                     ? `url(${selected.image})`
                     : undefined,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center top',
-                  borderColor: selected.color || '#22d3ee',
+                  borderColor: selected.color || 'var(--med-gold, #c9a227)',
                 }}
               />
               <div className="g-fight-side-meta">
@@ -3011,7 +2863,7 @@ export default function App() {
                 </span>
               </div>
             </div>
-            <span className="g-vs-vs" style={{ fontSize: 14 }}>
+            <span className="g-vs-vs med-vs-mark" style={{ fontSize: 14 }}>
               VS
             </span>
             <div className="g-fight-side g-fight-side-p2">
@@ -3027,13 +2879,13 @@ export default function App() {
               <div
                 className="g-fight-port"
                 style={{
-                  backgroundColor: '#12121c',
+                  backgroundColor: '#0e0c0a',
                   backgroundImage: p2Fighter.image
                     ? `url(${p2Fighter.image})`
                     : undefined,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center top',
-                  borderColor: p2Fighter.color || '#f472b6',
+                  borderColor: p2Fighter.color || 'var(--med-crimson-hot, #b82828)',
                 }}
               />
             </div>
@@ -3070,10 +2922,10 @@ export default function App() {
       )}
 
       {screen === 'result' && result && (
-        <>
+        <div className="med-result-stage">
           <ResultArcade
             won={result.won}
-            line={resultLine || (result.won ? 'Flawless energy' : 'Dust yourself off')}
+            line={resultLine || (result.won ? 'Flawless victory' : 'Dust yourself off')}
             opponent={result.opponent}
             fighterName={selected?.name}
             fighterImage={selected?.image || selected?.originalImage}
@@ -3122,8 +2974,16 @@ export default function App() {
               </div>
             ) : null}
           </section>
-        </>
+        </div>
       )}
+
+      {xamanPayload ? (
+        <XamanQrModal
+          payload={xamanPayload}
+          status={xamanStatus}
+          onCancel={cancelXamanSignIn}
+        />
+      ) : null}
 
       {toast ? (
         <div className="toast" role="status">
@@ -3135,6 +2995,7 @@ export default function App() {
         <NftDetail
           fighter={detailFighter}
           publicCard={publicCard}
+          ownerAddress={walletAddr || null}
           onClose={closeNftDetail}
           onSelectFight={
             detailFighter &&

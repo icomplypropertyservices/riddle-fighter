@@ -50,10 +50,12 @@ export type RawNft = {
   nft_taxon?: number
 }
 
-/** Public issuers/treasuries — never a Fighter player session. */
+/**
+ * Public issuers/treasuries — never a Fighter player session.
+ * rDiHMc… is a valid player wallet (suite game holder) — not banned here.
+ */
 export const FORBIDDEN_PLAYER_ADDRESSES = new Set(
   [
-    'rDiHMcZARsb1uakt8tYScLbZuLRihZqjMp',
     'rEwUuTNY3TaXAJL6T4y1tjkAnY7JPdX3dB',
     'rp5DGDDFZdQswWfn3sgkQznCAj9SkkCMLH',
     'rpHshLWWWJoitkWBAJVBpyBdQq425XE77C',
@@ -102,7 +104,7 @@ export function purgePoisonedTestWalletEverywhere(): number {
           }
         })(),
       )
-      if (!ok && (/rHvuNQ88/i.test(v) || /rDiHMcZA/i.test(v) || /rEwUuTNY/i.test(v))) {
+      if (!ok && (/rHvuNQ88/i.test(v) || /rEwUuTNY/i.test(v))) {
         localStorage.removeItem(k)
         n += 1
       }
@@ -617,11 +619,42 @@ async function enrichNft(n: RawNft): Promise<Fighter> {
     }
   }
 
-  const image =
-    n.image ||
-    n.imageUrl ||
-    String(meta.image || meta.image_url || meta.imageUrl || '') ||
-    ''
+  // Meta art slots: genesis (OLD) vs current/evolved (NEW)
+  const rw =
+    meta.riddleworld && typeof meta.riddleworld === 'object'
+      ? (meta.riddleworld as Record<string, unknown>)
+      : {}
+  const pickStr = (...vals: unknown[]) => {
+    for (const v of vals) {
+      const s = String(v ?? '').trim()
+      if (s) return s
+    }
+    return ''
+  }
+  const originalRaw = pickStr(
+    meta.original_image,
+    meta.originalImage,
+    meta.originalImageUrl,
+    rw.originalImageUrl,
+    rw.original_image,
+  )
+  const evolvedRaw = pickStr(
+    meta.new_image,
+    meta.newImage,
+    meta.evolved_image,
+    meta.evolvedImage,
+    rw.newImageUrl,
+    rw.evolvedImageUrl,
+  )
+  const currentRaw = pickStr(
+    n.image,
+    n.imageUrl,
+    meta.image,
+    meta.image_url,
+    meta.imageUrl,
+    rw.currentImageUrl,
+    rw.imageUrl,
+  )
   const name =
     n.name ||
     String(meta.name || meta.title || '') ||
@@ -646,7 +679,9 @@ async function enrichNft(n: RawNft): Promise<Fighter> {
   return fighterFromNft({
     nftId: n.NFTokenID,
     name,
-    image: resolveIpfs(image),
+    image: currentRaw ? resolveIpfs(currentRaw) : undefined,
+    originalImage: originalRaw ? resolveIpfs(originalRaw) : undefined,
+    newImage: evolvedRaw ? resolveIpfs(evolvedRaw) : undefined,
     issuer: n.Issuer || n.issuer,
     taxon: cat.taxon ?? taxon,
     collection: cat.collection || collection,

@@ -117,6 +117,10 @@ export {
   getDevEntitlement,
   loadDevEntitlement,
   grant,
+  grantHandleStarterCredits,
+  ensureStarterCredits,
+  HANDLE_STARTER_CREDITS,
+  STARTER_CREDITS,
   addCredits,
   addPaygCredits,
   addDevCredits,
@@ -168,7 +172,7 @@ export type {
 
 // ─── React ─────────────────────────────────────────────────────────────────
 
-export { useSuiteCredits, useSuiteTier } from './react.js';
+export { useSuiteCredits, useSuiteCreditsBridge, useSuiteTier } from './react.js';
 export type {
   UseSuiteCreditsResult,
   UseSuiteTierResult,

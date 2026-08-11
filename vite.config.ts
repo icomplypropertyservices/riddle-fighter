@@ -66,6 +66,9 @@ export default defineConfig({
       '@riddle/suite-credits': fileURLToPath(
         new URL('./packages/suite-credits/src/index.ts', import.meta.url),
       ),
+      '@riddle/suite-game-economy': fileURLToPath(
+        new URL('./packages/suite-game-economy/src/index.ts', import.meta.url),
+      ),
     },
   },
   server: {
@@ -74,7 +77,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [],
-    exclude: ['@riddle/suite-chrome', '@riddle/suite-credits'],
+    exclude: [
+      '@riddle/suite-chrome',
+      '@riddle/suite-credits',
+      '@riddle/suite-game-economy',
+    ],
   },
   build: {
     target: 'es2020',

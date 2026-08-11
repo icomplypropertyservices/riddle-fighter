@@ -1,8 +1,10 @@
 /**
  * Last minted lands strip for Fighter — same API as World/City.
  * Images linked by plot number; Scan updates owners from ledger.
+ * Art: Vercel blob JPEG only (meta static/lands is dead; no SVG covers).
  */
 import { useCallback, useEffect, useState } from 'react'
+import { landPlotImage, isSvgArtUrl, normalizeArtUrl } from '../lib/nftArt'
 
 export type LastMintedLand = {
   plot: number
@@ -19,14 +21,25 @@ const API =
     (import.meta as { env?: Record<string, string> }).env?.VITE_WORLD_API) ||
   (typeof import.meta !== 'undefined' &&
     (import.meta as { env?: Record<string, string> }).env?.VITE_API_BASE) ||
-  'https://reborn.riddlewallet.com'
+  'https://civ.riddlewallet.com'
 
 function pad(n: number) {
   return String(Math.max(1, Math.min(1000, n))).padStart(4, '0')
 }
 
+/** Live plot art — blob JPEG (suite SSOT with World/City). */
 function imgFor(plot: number) {
-  return `https://meta.riddlewallet.com/static/lands/${pad(plot)}.png`
+  return landPlotImage(plot)
+}
+
+/** Prefer API image when it is real raster; rewrite SVG / dead meta lands. */
+function resolveLandSrc(l: LastMintedLand): string {
+  const raw = String(l.image || l.imageUrl || '').trim()
+  if (raw) {
+    const n = normalizeArtUrl(raw)
+    if (n && !isSvgArtUrl(n) && !/\/static\/lands\//i.test(n)) return n
+  }
+  return imgFor(l.plot)
 }
 
 export function LastMintedLands() {
@@ -74,7 +87,7 @@ export function LastMintedLands() {
         <button type="button" className="btn" disabled={busy} onClick={() => void scan()}>
           {busy ? 'Scanning…' : 'Scan owners'}
         </button>
-        <a className="btn btn-ghost" href="https://reborn.riddlewallet.com/#/console/map" rel="noreferrer">
+        <a className="btn btn-ghost" href="https://civ.riddlewallet.com/" rel="noreferrer">
           Open map
         </a>
       </div>
@@ -85,7 +98,7 @@ export function LastMintedLands() {
         ) : (
           lands.map((l) => {
             const p = pad(l.plot)
-            const src = l.image || l.imageUrl || imgFor(l.plot)
+            const src = resolveLandSrc(l)
             return (
               <div key={l.plot} className="lands-rail__card">
                 <div className="lands-rail__media">
@@ -101,10 +114,14 @@ export function LastMintedLands() {
                     referrerPolicy="no-referrer"
                     onError={(e) => {
                       const el = e.currentTarget
+                      // Raster-only chain: API → blob JPEG. Never SVG.
                       if (!el.dataset.fallback) {
                         el.dataset.fallback = '1'
-                        el.src = `https://meta.riddlewallet.com/static/lands/${p}.svg`
-                        return
+                        const blob = imgFor(l.plot)
+                        if (el.src !== blob) {
+                          el.src = blob
+                          return
+                        }
                       }
                       el.style.display = 'none'
                     }}

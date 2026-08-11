@@ -414,9 +414,14 @@ export function cpuFromOwned(
       special: Math.max(10, Math.round(s.special * mult)),
     },
     // Keep real NFT art so fight uses their assets, not fake demos
-    image: owned.image || owned.originalImage || owned.newImage,
+    // Preserve OLD (genesis) vs NEW (evolved) — do not collapse slots
+    image: owned.image || owned.newImage || owned.originalImage,
     originalImage: owned.originalImage || owned.image,
-    newImage: owned.newImage,
+    newImage:
+      owned.newImage &&
+      owned.newImage !== (owned.originalImage || owned.image)
+        ? owned.newImage
+        : undefined,
   }
 }
 

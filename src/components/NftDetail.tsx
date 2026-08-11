@@ -1,21 +1,30 @@
 /**
- * Per-NFT public detail — OLD | NEW art, stats, fight history, share link.
+ * Per-NFT champion sheet — portrait, all traits, W/L · XP · upgrade JSON.
  */
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Fighter } from '../lib/fighters'
 import { CATEGORY_LABEL } from '../lib/nftCatalog'
+import { artUrlsEqual, splitArtSlots } from '../lib/nftArt'
 import {
   loadNftFightHistory,
   publicNftViewUrl,
   type NftFightEvent,
   type NftPublicCard,
 } from '../lib/nftFightHistory'
+import {
+  downloadUpgradeJson,
+  fetchProgress,
+  loadLocalProgress,
+  upgradeFighterWithXp,
+  type FighterProgress,
+} from '../lib/fighterProgress'
+import { ChampionFrame } from '../ui/ChampionFrame'
 
 type Props = {
   fighter?: Fighter | null
-  /** When opened from ?view= without full fighter (public card only). */
   publicCard?: NftPublicCard | null
   history?: NftFightEvent[]
+  ownerAddress?: string | null
   onClose: () => void
   onSelectFight?: () => void
   onShare?: (url: string) => void
@@ -31,11 +40,8 @@ function ArtSlot({
   pending?: boolean
 }) {
   return (
-    <div className={`nft-art-slot${label === 'NEW' ? ' new' : ''}`}>
-      <span className="nft-art-tag">{label}</span>
-      <div className="nft-art-pending" aria-hidden>
-        {pending || !url ? 'soon' : '—'}
-      </div>
+    <div className={`nd-art-slot${label === 'NEW' ? ' is-new' : ''}`}>
+      <span className="nd-art-tag">{label}</span>
       {url && !pending ? (
         <img
           src={url}
@@ -43,14 +49,16 @@ function ArtSlot({
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          style={{ maxWidth: '100%' }}
+          className="nd-art-img"
           onError={(e) => {
             const el = e.currentTarget
             el.style.display = 'none'
             el.removeAttribute('src')
           }}
         />
-      ) : null}
+      ) : (
+        <div className="nd-art-ph">{pending || !url ? 'Soon' : '—'}</div>
+      )}
     </div>
   )
 }
@@ -59,27 +67,29 @@ export function NftDetail({
   fighter,
   publicCard,
   history: historyProp,
+  ownerAddress,
   onClose,
   onSelectFight,
   onShare,
 }: Props) {
   const name = fighter?.name || publicCard?.name || 'NFT'
-  const nftId = fighter?.nftId || fighter?.id?.replace(/^nft-/, '') || publicCard?.nftId || ''
-  const oldUrl =
-    fighter?.originalImage ||
-    publicCard?.originalImage ||
-    (fighter?.newImage ? undefined : fighter?.image) ||
-    publicCard?.image
+  const nftId =
+    fighter?.nftId || fighter?.id?.replace(/^nft-/, '') || publicCard?.nftId || ''
+  const artSlots = splitArtSlots({
+    name,
+    image: fighter?.image || publicCard?.image,
+    originalImage: fighter?.originalImage || publicCard?.originalImage,
+    newImage: fighter?.newImage || publicCard?.newImage,
+    taxon: fighter?.taxon ?? publicCard?.taxon,
+    collection: fighter?.collection || publicCard?.collection,
+    traits: fighter?.traits,
+  })
+  const displayOld = artSlots.originalImage || fighter?.image || publicCard?.image
   const newUrl =
-    fighter?.newImage ||
-    publicCard?.newImage ||
-    (fighter?.originalImage && fighter?.image && fighter.image !== fighter.originalImage
-      ? fighter.image
-      : undefined)
-  const hasNew = Boolean(newUrl && newUrl !== oldUrl)
-  const displayOld = oldUrl || fighter?.image || publicCard?.image
-  const wins = fighter?.wins ?? publicCard?.wins ?? 0
-  const losses = fighter?.losses ?? publicCard?.losses ?? 0
+    artSlots.newImage && !artUrlsEqual(artSlots.newImage, displayOld)
+      ? artSlots.newImage
+      : undefined
+  const hasNew = Boolean(newUrl)
   const collection = fighter?.collection || publicCard?.collection
   const category =
     fighter?.categoryLabel ||
@@ -88,9 +98,47 @@ export function NftDetail({
   const taxon = fighter?.taxon ?? publicCard?.taxon
   const special = fighter?.specialName || publicCard?.specialName
   const stats = fighter?.stats
-  const traits = fighter?.traits || []
-  const fightable = fighter?.fightable !== false &&
+  const baseTraits = fighter?.traits || []
+  const fightable =
+    fighter?.fightable !== false &&
     (fighter?.category === 'human' || fighter?.category === 'god' || !fighter?.category)
+
+  const [progress, setProgress] = useState<FighterProgress>(() =>
+    loadLocalProgress(nftId),
+  )
+  const [upgradeBusy, setUpgradeBusy] = useState(false)
+  const [upgradeMsg, setUpgradeMsg] = useState('')
+
+  useEffect(() => {
+    if (!nftId) return
+    let cancelled = false
+    void fetchProgress(nftId).then((r) => {
+      if (!cancelled && r?.progress) setProgress(r.progress)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [nftId])
+
+  const wins = progress.wins || fighter?.wins || publicCard?.wins || 0
+  const losses = progress.losses || fighter?.losses || publicCard?.losses || 0
+  const traits = useMemo(() => {
+    const map = new Map<string, { trait_type?: string; value?: unknown }>()
+    for (const t of baseTraits) {
+      const k = String(t.trait_type || '').toLowerCase()
+      if (k) map.set(k, t)
+    }
+    for (const t of progress.traits || []) {
+      const k = String(t.trait_type || t.trait || '').toLowerCase()
+      if (k) map.set(k, t)
+    }
+    // Always surface progress traits
+    map.set('wins', { trait_type: 'Wins', value: wins })
+    map.set('losses', { trait_type: 'Losses', value: losses })
+    map.set('xp', { trait_type: 'XP', value: progress.xp })
+    map.set('level', { trait_type: 'Level', value: progress.level })
+    return [...map.values()]
+  }, [baseTraits, progress, wins, losses])
 
   const history = useMemo(() => {
     if (historyProp) return historyProp
@@ -102,9 +150,13 @@ export function NftDetail({
     return publicNftViewUrl(nftId)
   }, [nftId])
 
+  const heroImg = newUrl || displayOld
+  const xpCost = 100
+  const canUpgrade = progress.xp >= xpCost
+
   return (
     <div
-      className="nft-detail-overlay"
+      className="nd-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="nft-detail-title"
@@ -112,37 +164,51 @@ export function NftDetail({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="nft-detail-sheet panel" data-nft-detail="1">
-        <div className="nft-detail-head">
-          <div>
-            <p className="hint" style={{ margin: 0, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              Public NFT · OLD + NEW
-            </p>
-            <h2 id="nft-detail-title" style={{ margin: '4px 0 0' }}>
-              {name}
-            </h2>
-            {nftId ? (
-              <p className="quote" style={{ wordBreak: 'break-all', fontSize: 11 }}>
-                {nftId}
-              </p>
-            ) : null}
+      <div className="nd-sheet panel med-champion-sheet" data-nft-detail="1">
+        <header className="nd-head">
+          <div className="nd-head-text">
+            <p className="nd-kicker">Champion sheet</p>
+            <h2 id="nft-detail-title">{name}</h2>
+            {nftId ? <p className="nd-id">{nftId}</p> : null}
           </div>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close">
             Close
           </button>
-        </div>
+        </header>
 
-        <div className="nft-dual-row" data-dual="1">
+        {heroImg || stats ? (
+          <ChampionFrame
+            name={name}
+            image={heroImg}
+            sub={[category, collection].filter(Boolean).join(' · ')}
+            powerLevel={
+              typeof fighter?.powerLevel === 'number' ? fighter.powerLevel : undefined
+            }
+            badge={fightable ? 'FIGHTABLE' : 'VIEW'}
+            stats={
+              stats
+                ? {
+                    hp: stats.hp,
+                    atk: stats.atk,
+                    def: stats.def,
+                    speed: stats.speed,
+                  }
+                : undefined
+            }
+          />
+        ) : null}
+
+        <div className="nd-dual" data-dual="1">
           <ArtSlot url={displayOld} label="OLD" />
           <ArtSlot url={hasNew ? newUrl : undefined} label="NEW" pending={!hasNew} />
         </div>
-        <p className="hint" style={{ marginTop: 6 }}>
+        <p className="nd-cap">
           {hasNew
-            ? 'OLD = ledger genesis · NEW = evolved / mutable art'
-            : 'OLD = current ledger art · NEW appears after evolve / remint'}
+            ? 'OLD = genesis · NEW = evolved art'
+            : 'OLD = current art · NEW after evolve'}
         </p>
 
-        <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+        <div className="nd-chips">
           {category ? <span className="chip">{category}</span> : null}
           {collection ? <span className="chip solid">{collection}</span> : null}
           {taxon != null && Number.isFinite(Number(taxon)) ? (
@@ -154,11 +220,17 @@ export function NftDetail({
           <span className="chip lose">
             L <strong>{losses}</strong>
           </span>
+          <span className="chip" data-testid="nft-xp">
+            XP <strong>{progress.xp}</strong>
+          </span>
+          <span className="chip" data-testid="nft-level">
+            LVL <strong>{progress.level}</strong>
+          </span>
           {special ? <span className="chip">{special}</span> : null}
         </div>
 
         {stats ? (
-          <div className="nft-stats-grid">
+          <div className="nd-stats">
             <div>
               HP <b>{stats.hp}</b>
             </div>
@@ -177,11 +249,83 @@ export function NftDetail({
           </div>
         ) : null}
 
+        <div className="nd-xp-panel" data-testid="nft-xp-panel">
+          <h3>XP · upgrades · on-chain JSON</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Fight to earn XP. Spend XP to upgrade traits, then download JSON for on-chain
+            metadata URI updates. All NFT traits are stored with W/L.
+            {ownerAddress ? ` · owner ${ownerAddress.slice(0, 6)}…` : ''}
+          </p>
+          <div className="nd-xp-bar" aria-label="XP progress">
+            <i
+              style={{
+                width: `${Math.min(100, (progress.xp % 100))}%`,
+              }}
+            />
+          </div>
+          <p className="quote">
+            {progress.xp % 100}/100 to L{progress.level + 1} · upgrades {progress.upgradeLevel || 0} ·
+            DB {progress.persisted || 'local'}
+          </p>
+          <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <button
+              type="button"
+              className="btn btn-ok btn-sm"
+              disabled={!canUpgrade || upgradeBusy || !nftId}
+              data-testid="nft-upgrade-xp"
+              onClick={() => {
+                if (!nftId) return
+                setUpgradeBusy(true)
+                setUpgradeMsg('')
+                void upgradeFighterWithXp({ nftId, stat: 'Power', cost: xpCost }).then(
+                  (r) => {
+                    setUpgradeBusy(false)
+                    setProgress(r.progress)
+                    if (!r.ok) {
+                      setUpgradeMsg(r.error || 'Upgrade failed')
+                      return
+                    }
+                    setUpgradeMsg(`Upgraded · −${r.cost} XP · UL${r.progress.upgradeLevel}`)
+                    if (r.upgradeJson) downloadUpgradeJson(r.upgradeJson, `fighter-${nftId.slice(0, 8)}-upgrade.json`)
+                  },
+                )
+              }}
+            >
+              {upgradeBusy ? '…' : `Upgrade Power · ${xpCost} XP`}
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={!nftId}
+              data-testid="nft-download-json"
+              onClick={() => {
+                void fetchProgress(nftId).then((r) => {
+                  const meta =
+                    r?.metadata ||
+                    ({
+                      name,
+                      attributes: traits.map((t) => ({
+                        trait_type: String(t.trait_type || 'Trait'),
+                        value: t.value,
+                      })),
+                    } as import('../lib/fighterProgress').FighterMetadataJson)
+                  if (r?.progress) setProgress(r.progress)
+                  downloadUpgradeJson(meta, `fighter-${nftId.slice(0, 8)}-meta.json`)
+                  setUpgradeMsg('JSON downloaded — pin URI / update on-chain meta')
+                })
+              }}
+            >
+              Download meta JSON
+            </button>
+          </div>
+          {upgradeMsg ? <p className="quote">{upgradeMsg}</p> : null}
+        </div>
+
         {traits.length > 0 ? (
-          <div style={{ marginTop: 12 }}>
-            <h3 style={{ fontSize: 13, margin: '0 0 6px' }}>Traits</h3>
-            <ul className="nft-trait-list">
-              {traits.slice(0, 16).map((t, i) => (
+          <div className="nd-traits-wrap">
+            <h3>All traits ({traits.length})</h3>
+            <ul className="nd-traits">
+              {traits.map((t, i) => (
                 <li key={`${t.trait_type}-${i}`}>
                   <span>{String(t.trait_type || 'Trait')}</span>
                   <b>{String(t.value ?? '—')}</b>
@@ -191,23 +335,20 @@ export function NftDetail({
           </div>
         ) : null}
 
-        <div style={{ marginTop: 14 }}>
-          <h3 style={{ fontSize: 13, margin: '0 0 6px' }}>Fight history</h3>
-          <ul className="history nft-fight-history">
+        <div className="nd-history-wrap">
+          <h3>Fight history</h3>
+          <ul className="nd-history">
             {history.length === 0 ? (
-              <li style={{ justifyContent: 'center', opacity: 0.65 }}>No fights yet — hit the arena</li>
+              <li className="nd-history-empty">No fights yet</li>
             ) : (
-              history.slice(0, 20).map((h) => (
+              history.slice(0, 16).map((h) => (
                 <li key={h.id}>
                   <span>
-                    <span className={h.won ? 'won' : 'lost'}>{h.won ? 'WIN' : 'LOSS'}</span>{' '}
-                    vs {h.opponent}
-                    {h.combo && h.combo >= 3 ? ` · combo ${h.combo}` : ''}
-                    {h.note ? ` · ${h.note}` : ''}
+                    <span className={h.won ? 'won' : 'lost'}>{h.won ? 'W' : 'L'}</span> vs{' '}
+                    {h.opponent}
                   </span>
-                  <span style={{ color: 'var(--riddle-muted)', fontSize: 11 }}>
+                  <span className="nd-history-meta">
                     {h.at ? new Date(h.at).toLocaleDateString() : h.mode}
-                    {h.wagerCredits ? ` · ${h.wagerCredits} cr` : ''}
                   </span>
                 </li>
               ))
@@ -215,10 +356,10 @@ export function NftDetail({
           </ul>
         </div>
 
-        <div className="row" style={{ marginTop: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div className="nd-actions">
           {fightable && onSelectFight ? (
             <button type="button" className="btn btn-ok" onClick={onSelectFight}>
-              Fight with this NFT
+              Fight with this champion
             </button>
           ) : null}
           {shareUrl ? (
@@ -230,32 +371,16 @@ export function NftDetail({
                 onShare?.(shareUrl)
               }}
             >
-              Copy public link
+              Copy link
             </button>
           ) : null}
           <a
             className="btn btn-sm"
-            href={`https://city.riddlewallet.com/?from=fighter&nft=${encodeURIComponent(nftId)}&mode=civ`}
+            href={`https://civ.riddlewallet.com/?from=fighter&nft=${encodeURIComponent(nftId)}`}
             target="_blank"
             rel="noreferrer"
           >
-            Cities · land &amp; civ
-          </a>
-          <a
-            className="btn btn-sm"
-            href={`https://reborn.riddlewallet.com/?from=fighter&nft=${encodeURIComponent(nftId)}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Reborn dash
-          </a>
-          <a
-            className="btn btn-ghost btn-sm"
-            href="https://wallet.riddlewallet.com/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Wallet
+            Open in Civ
           </a>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Close

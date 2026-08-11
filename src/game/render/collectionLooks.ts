@@ -55,7 +55,8 @@ export type CollectionLook = {
   outline: string
 }
 
-const LOOKS: Record<FighterCollectionId, CollectionLook> = {
+/** Exported for frame-bake / pose preview tools */
+export const LOOKS: Record<FighterCollectionId, CollectionLook> = {
   inquiry: {
     id: 'inquiry',
     label: 'The Inquiry',
@@ -264,4 +265,13 @@ export function getCollectionLook(input: {
   return base
 }
 
-export { LOOKS }
+/** Distinct looks to bake into multi-frame packs (skip pure aliases). */
+export const LOOKS_FOR_BAKE: CollectionLook[] = [
+  LOOKS.starter,
+  LOOKS.inquisition,
+  LOOKS.inquiry,
+  LOOKS.reborn,
+  LOOKS.bridge,
+  LOOKS.generic_human,
+  LOOKS.generic_god,
+]

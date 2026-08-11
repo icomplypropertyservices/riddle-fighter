@@ -38,7 +38,7 @@ function bind(
 export function TouchControls({ onChange, label, side = 'full' }: Props) {
   return (
     <div
-      className={`touch touch-${side}`}
+      className={`touch touch-${side} med-iron-pad`}
       aria-label={label || 'Touch controls'}
     >
       {label ? <div className="touch-label">{label}</div> : null}

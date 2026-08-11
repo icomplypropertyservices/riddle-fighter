@@ -1,0 +1,1296 @@
+/**
+ * MEDIEVAL ARENA — canonical theme (stone · gold · crimson · parchment)
+ * Scoped under [data-med-arena] / [data-castle-shell].
+ * Tokens live in castle-tokens.css (SSOT). Solid plates only — no neon purple.
+ */
+
+/* —— App shell background (solid) —— */
+[data-med-arena],
+[data-med-arena='1'],
+[data-castle-shell],
+[data-castle-shell='1'] {
+  color: var(--castle-text);
+  background: var(--castle-ink) !important;
+}
+
+[data-med-arena].app.has-suite-chrome,
+[data-castle-shell].app.has-suite-chrome {
+  background: var(--castle-ink) !important;
+  color: var(--castle-text);
+}
+
+/* —— Shared metal plate (solid shadow, no neon glow) —— */
+[data-med-arena] .med-plate,
+[data-med-arena] .g-vs-fight,
+[data-med-arena] .fd-mode,
+[data-med-arena] .g-result-frame {
+  box-shadow:
+    inset 0 1px 0 #ffffff14,
+    inset 0 -2px 0 #00000055,
+    0 6px 0 #00000066,
+    0 10px 24px #00000080;
+}
+
+/* —— Kill neon build chrome —— */
+[data-med-arena] .fd-build-tag {
+  display: none !important;
+}
+
+/* Soft-kill leftover neon glow vars inside arena */
+[data-med-arena] *,
+[data-castle-shell] * {
+  --tw-shadow-color: transparent;
+}
+
+/* —— Hero: attract plate —— */
+[data-med-arena] .fd-hero,
+[data-med-arena] .med-hero {
+  position: relative;
+  border: 2px solid var(--castle-edge-bright);
+  border-radius: 8px;
+  background: var(--castle-panel);
+  overflow: hidden;
+  margin-bottom: 4px;
+  box-shadow:
+    inset 0 1px 0 #2a241c,
+    0 8px 24px #00000088;
+}
+
+[data-med-arena] .fd-hero-glow {
+  display: none;
+}
+
+[data-med-arena] .fd-hero-inner,
+[data-med-arena] .med-hero-inner {
+  position: relative;
+  z-index: 1;
+  padding: 18px 16px 16px;
+}
+
+[data-med-arena] .fd-hero-row1,
+[data-med-arena] .med-crest-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-med-arena] .fd-badge,
+[data-med-arena] .med-badge {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  padding: 5px 12px;
+  border-radius: 3px;
+  background: var(--castle-iron);
+  border: 1px solid var(--castle-edge-bright);
+  color: var(--castle-gold-hi);
+  text-transform: uppercase;
+}
+
+[data-med-arena] .fd-badge-live,
+[data-med-arena] .med-badge-live {
+  background: var(--castle-blood);
+  border-color: var(--castle-crimson);
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .fd-title,
+[data-med-arena] .med-title {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(1.55rem, 6.5vw, 2.35rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.05;
+  color: var(--castle-parchment);
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 #000, 0 4px 0 #3d1a0a;
+}
+
+[data-med-arena] .fd-title-x,
+[data-med-arena] .med-title-x {
+  margin: 0 0.15em;
+  color: var(--castle-crimson-hi);
+  text-shadow: 0 2px 0 #000;
+}
+
+[data-med-arena] .fd-title-accent,
+[data-med-arena] .med-title-accent {
+  color: var(--castle-gold-hi);
+  text-shadow: 0 2px 0 #000, 0 4px 0 #5a3a08 !important;
+}
+
+[data-med-arena] .med-ornament {
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.4em;
+  color: var(--castle-gold);
+  margin: 6px 0 0;
+  opacity: 0.9;
+}
+
+[data-med-arena] .fd-sub,
+[data-med-arena] .med-sub {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--castle-mute);
+  font-weight: 600;
+}
+
+[data-med-arena] .fd-steps {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+[data-med-arena] .fd-steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 9px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--castle-edge);
+  background: var(--castle-iron);
+  color: var(--castle-mute);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+[data-med-arena] .fd-steps li em {
+  font-style: normal;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 900;
+  background: var(--castle-panel-2);
+  color: var(--castle-mute);
+  border: 1px solid var(--castle-edge);
+}
+
+[data-med-arena] .fd-steps li.is-now {
+  border-color: var(--castle-gold);
+  background: #1a160c;
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .fd-steps li.is-now em {
+  background: var(--castle-gold);
+  color: var(--castle-ink);
+  border-color: var(--castle-gold-hi);
+}
+
+[data-med-arena] .fd-steps li.is-done {
+  border-color: var(--castle-green);
+  color: #8fca9a;
+}
+
+[data-med-arena] .fd-steps li.is-done em {
+  background: var(--castle-green);
+  color: #ecfdf5;
+  border-color: var(--castle-green);
+}
+
+[data-med-arena] .fd-selected {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--castle-gold);
+}
+
+[data-med-arena] .fd-selected.muted {
+  color: var(--castle-mute);
+}
+
+[data-med-arena] .fd-selected strong {
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .fd-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+[data-med-arena] .fd-stat {
+  background: var(--castle-iron);
+  border: 1px solid var(--castle-edge);
+  border-radius: 4px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+[data-med-arena] .fd-stat span {
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: var(--castle-gold-dim);
+  margin-bottom: 4px;
+}
+
+[data-med-arena] .fd-stat b {
+  font-size: 16px;
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .fd-stat b i.w {
+  color: #8fca9a;
+}
+
+[data-med-arena] .fd-stat b i.l {
+  color: var(--castle-crimson-hi);
+}
+
+[data-med-arena] .fd-stat b.hot {
+  color: var(--castle-gold-hi);
+}
+
+/* —— Mode select: crests / cabinet tiles —— */
+[data-med-arena] .fd-modes,
+[data-med-arena] .med-modes,
+[data-med-arena] .med-mode-board {
+  background: var(--castle-panel);
+  border: 2px solid var(--castle-edge);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 8px 20px #00000055;
+}
+
+[data-med-arena] .fd-modes-label,
+[data-med-arena] .med-modes-label {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--castle-gold-dim);
+  margin-bottom: 10px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+[data-med-arena] .fd-modes-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 768px) {
+  [data-med-arena] .fd-modes-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-med-arena] .fd-modes-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+[data-med-arena] .fd-mode,
+[data-med-arena] .med-mode,
+[data-med-arena] .med-mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 12px 6px 10px;
+  border-radius: 6px;
+  border: 2px solid var(--castle-edge);
+  background: var(--castle-iron);
+  color: var(--castle-mute);
+  cursor: pointer;
+  min-height: 78px;
+  min-width: 0;
+  max-width: 100%;
+  touch-action: manipulation;
+  position: relative;
+  transition: border-color 0.12s, color 0.12s, transform 0.08s;
+}
+
+[data-med-arena] .fd-mode:active,
+[data-med-arena] .med-mode:active {
+  transform: translateY(2px);
+}
+
+[data-med-arena] .fd-mode-ico,
+[data-med-arena] .med-crest {
+  display: grid !important;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--castle-edge-bright);
+  background: var(--castle-panel-2);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--castle-gold-hi);
+  margin-bottom: 2px;
+}
+
+[data-med-arena] .fd-mode.is-on,
+[data-med-arena] .med-mode.is-on {
+  border-color: var(--castle-gold);
+  background: #1c160a;
+  color: var(--castle-parchment);
+  box-shadow: inset 0 0 0 1px var(--castle-gold-dim);
+}
+
+[data-med-arena] .fd-mode.is-on .fd-mode-ico,
+[data-med-arena] .med-mode.is-on .med-crest {
+  border-color: var(--castle-gold-hi);
+  color: var(--castle-ink);
+  background: var(--castle-gold);
+}
+
+[data-med-arena] .fd-mode-t {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+[data-med-arena] .fd-mode-s {
+  font-size: 9px;
+  opacity: 0.85;
+}
+
+[data-med-arena] .fd-mode-price {
+  margin-top: 3px;
+  min-height: 20px;
+  min-width: 44px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #1a1408;
+  border: 1px solid var(--castle-gold-dim);
+  color: var(--castle-gold-hi);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+[data-med-arena] .fd-mode.is-on .fd-mode-price {
+  border-color: var(--castle-gold);
+  background: #221a08;
+}
+
+[data-med-arena] .fd-mode.is-primary:not(.is-on) {
+  border-color: var(--castle-edge-bright);
+}
+
+[data-med-arena] .fd-mode.is-on.is-primary {
+  border-color: var(--castle-gold);
+}
+
+/* Force crest icons visible (override dash hide) */
+[data-med-arena] .fd-mode-ico.med-crest {
+  display: grid !important;
+  place-items: center;
+}
+
+/* —— VS ready bar —— */
+[data-med-arena] .g-vs,
+[data-med-arena] .med-vs,
+[data-med-arena] .med-vs-plate {
+  border: 2px solid var(--castle-edge-bright) !important;
+  background: var(--castle-panel) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  box-shadow:
+    inset 0 1px 0 #2a241c,
+    0 0 0 1px #00000055 !important;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+[data-med-arena] .g-vs-port {
+  background: var(--castle-iron) !important;
+  border: 1px solid var(--castle-edge) !important;
+  border-radius: 6px !important;
+}
+
+[data-med-arena] .g-vs-art {
+  border-radius: 6px !important;
+  border-width: 2px !important;
+  background-color: #120e0a !important;
+}
+
+[data-med-arena] .g-vs-port-p1 .g-vs-art {
+  border-color: var(--castle-p1) !important;
+}
+
+[data-med-arena] .g-vs-port-p2 .g-vs-art {
+  border-color: var(--castle-p2) !important;
+}
+
+[data-med-arena] .g-vs-side {
+  color: var(--castle-gold-dim) !important;
+  letter-spacing: 0.14em !important;
+}
+
+[data-med-arena] .g-vs-name {
+  color: var(--castle-parchment) !important;
+}
+
+[data-med-arena] .g-vs-kit {
+  color: var(--castle-parchment-dim) !important;
+}
+
+[data-med-arena] .g-vs-kit.muted {
+  color: var(--castle-mute) !important;
+}
+
+[data-med-arena] .g-vs-vs,
+[data-med-arena] .med-vs-mark {
+  font-size: 20px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.2em !important;
+  color: var(--castle-crimson-hi) !important;
+  text-shadow: none !important;
+}
+
+[data-med-arena] .g-vs-sub {
+  color: var(--castle-mute) !important;
+}
+
+/* FIGHT plate — solid crimson when ready */
+[data-med-arena] .g-vs-fight,
+[data-med-arena] .med-fight-plate {
+  width: 100%;
+  max-width: 300px;
+  min-width: 44px;
+  min-height: 56px !important;
+  border-radius: 6px !important;
+  border: 2px solid var(--castle-edge-bright) !important;
+  background: var(--castle-iron) !important;
+  color: var(--castle-mute) !important;
+  font-weight: 900 !important;
+  font-size: 15px !important;
+  letter-spacing: 0.18em !important;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  position: relative;
+}
+
+[data-med-arena] .g-vs-fight.is-ready,
+[data-med-arena] .med-fight-plate.is-ready {
+  background: var(--castle-crimson) !important;
+  border-color: var(--castle-gold) !important;
+  color: var(--castle-parchment) !important;
+  font-size: 16px !important;
+  min-height: 52px !important;
+  letter-spacing: 0.2em !important;
+  text-shadow: none !important;
+  box-shadow:
+    inset 0 1px 0 #c45a5a33,
+    0 4px 16px #00000066 !important;
+  animation: med-fight-pulse 1.4s ease-in-out infinite;
+}
+
+[data-med-arena] .g-vs-fight.is-ready:hover {
+  background: var(--castle-crimson-hi) !important;
+}
+
+[data-med-arena] .g-vs-fight.is-broke {
+  background: #1a0c0c !important;
+  border-color: var(--castle-blood) !important;
+  color: #e8a0a0 !important;
+  animation: none !important;
+}
+
+[data-med-arena] .g-vs-fight:disabled:not(.is-ready) {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+[data-med-arena] .g-vs-price {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+  opacity: 0.9;
+  color: var(--castle-gold-hi);
+}
+
+[data-med-arena] .g-vs-fight.is-ready .g-vs-price {
+  color: var(--castle-gold-hi);
+}
+
+[data-med-arena] .g-vs-bal {
+  font-size: 11px;
+  color: var(--castle-mute);
+}
+
+[data-med-arena] .g-vs-bal.is-short {
+  color: var(--castle-crimson-hi);
+}
+
+[data-med-arena] .g-vs-pl,
+[data-med-arena] .g-pick-pl-inline {
+  background: var(--castle-gold) !important;
+  border-color: var(--castle-gold-dim) !important;
+  color: var(--castle-ink) !important;
+  border-radius: 3px;
+}
+
+[data-med-arena] .g-vs-stats-row {
+  border-top: 1px solid var(--castle-edge);
+  color: var(--castle-mute);
+}
+
+[data-med-arena] .g-vs-stats-row span {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+  border-radius: 4px;
+  color: var(--castle-parchment-dim);
+}
+
+@keyframes med-fight-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.08);
+  }
+}
+
+/* —— Panels / titles —— */
+[data-med-arena] .g-panel,
+[data-med-arena] .panel {
+  background: var(--castle-panel) !important;
+  border: 1px solid var(--castle-edge) !important;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px #00000055;
+}
+
+[data-med-arena] .g-panel-title {
+  color: var(--castle-gold-hi) !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  font-size: 0.95rem !important;
+}
+
+[data-med-arena] .g-panel-hint,
+[data-med-arena] .hint,
+[data-med-arena] .fp-hint {
+  color: var(--castle-mute);
+}
+
+[data-med-arena] .panel h2 {
+  color: var(--castle-gold-dim);
+}
+
+/* —— Fighter picker —— */
+[data-med-arena] .g-pick,
+[data-med-arena] .fp-root {
+  border: 2px solid var(--castle-edge) !important;
+  background: var(--castle-panel) !important;
+  border-radius: 8px !important;
+}
+
+[data-med-arena] .fp-selected {
+  position: relative;
+  padding-top: 18px;
+  border: 2px solid var(--castle-gold) !important;
+  background: #1a160c !important;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--castle-gold-dim);
+}
+
+[data-med-arena] .fp-selected::before {
+  content: 'CHAMPION';
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--castle-gold-hi);
+  opacity: 0.85;
+}
+
+[data-med-arena] .fp-selected-thumb {
+  border-color: var(--castle-gold) !important;
+  border-radius: 6px;
+  background: #120e0a;
+}
+
+[data-med-arena] .fp-selected-name {
+  color: var(--castle-parchment);
+  letter-spacing: 0.02em;
+}
+
+[data-med-arena] .fp-selected-moves {
+  color: var(--castle-parchment-dim);
+}
+
+[data-med-arena] .fp-pl {
+  color: var(--castle-gold-hi);
+}
+
+[data-med-arena] .fp-balance {
+  background: #1a1408;
+  border-color: var(--castle-gold-dim);
+  color: var(--castle-gold-hi);
+  border-radius: 4px;
+}
+
+[data-med-arena] .fp-search,
+[data-med-arena] .fp-sort,
+[data-med-arena] .g-pick-search,
+[data-med-arena] .g-pick-sort {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+  color: var(--castle-text);
+  border-radius: 6px;
+}
+
+[data-med-arena] .fp-tab,
+[data-med-arena] .g-pick-tab {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+  color: var(--castle-mute);
+  border-radius: 4px;
+}
+
+[data-med-arena] .fp-tab em,
+[data-med-arena] .g-pick-tab em {
+  color: var(--castle-gold);
+}
+
+[data-med-arena] .fp-tab.is-on,
+[data-med-arena] .g-pick-tab.is-on {
+  border-color: var(--castle-gold) !important;
+  background: #1c160a !important;
+  color: var(--castle-parchment) !important;
+}
+
+[data-med-arena] .fp-card,
+[data-med-arena] .g-pick-card {
+  background: var(--castle-iron) !important;
+  border: 2px solid var(--castle-edge) !important;
+  border-radius: 6px !important;
+}
+
+[data-med-arena] .fp-card.is-on,
+[data-med-arena] .g-pick-card.is-on {
+  border-color: var(--castle-gold) !important;
+  box-shadow: inset 0 0 0 1px var(--castle-gold-dim) !important;
+  background: #1a1408 !important;
+}
+
+[data-med-arena] .fp-card-art,
+[data-med-arena] .g-pick-art {
+  background: #120e0a !important;
+  background-color: #120e0a !important;
+}
+
+[data-med-arena] .fp-card-pl,
+[data-med-arena] .g-pick-pl {
+  background: var(--castle-gold) !important;
+  color: var(--castle-ink) !important;
+  border-color: var(--castle-gold-dim) !important;
+  border-radius: 3px;
+}
+
+[data-med-arena] .fp-card-sel,
+[data-med-arena] .g-pick-sel {
+  background: var(--castle-crimson) !important;
+  color: var(--castle-parchment) !important;
+}
+
+[data-med-arena] .fp-card-god,
+[data-med-arena] .g-pick-god {
+  background: #5c3a0a;
+  color: var(--castle-gold-hi);
+  border: 1px solid var(--castle-gold-dim);
+}
+
+[data-med-arena] .fp-card-name,
+[data-med-arena] .g-pick-name {
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .fp-card-line,
+[data-med-arena] .g-pick-stats {
+  color: var(--castle-mute);
+}
+
+[data-med-arena] .fp-card-chips span,
+[data-med-arena] .g-pick-chip {
+  color: var(--castle-parchment-dim);
+  background: #1a160c;
+  border-color: var(--castle-edge);
+}
+
+[data-med-arena] .fp-card-view,
+[data-med-arena] .g-pick-view {
+  background: var(--castle-panel);
+  border-color: var(--castle-edge);
+  color: var(--castle-gold);
+}
+
+[data-med-arena] .fp-trait {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+  color: var(--castle-parchment-dim);
+}
+
+[data-med-arena] .fp-trait em {
+  color: var(--castle-mute);
+}
+
+[data-med-arena] .fp-card-art {
+  height: 88px;
+  min-height: 88px;
+  max-height: 88px;
+}
+
+@media (min-width: 640px) {
+  [data-med-arena] .fp-card-art {
+    height: 108px;
+    min-height: 108px;
+    max-height: 108px;
+  }
+  [data-med-arena] .fp-selected-thumb {
+    width: 84px;
+    height: 84px;
+  }
+}
+
+/* —— Fight shell —— */
+[data-med-arena] .g-fight-shell {
+  border: 2px solid var(--castle-edge-bright);
+  background: #0a0806;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px #2a241c;
+}
+
+[data-med-arena] .g-fight-p1 {
+  color: var(--castle-p1) !important;
+}
+
+[data-med-arena] .g-fight-p2 {
+  color: var(--castle-p2) !important;
+}
+
+[data-med-arena] .g-fight-pl {
+  color: var(--castle-gold-hi);
+}
+
+[data-med-arena] .g-fight-port {
+  border-color: var(--castle-edge-bright);
+  background-color: #120e0a;
+  border-radius: 6px;
+}
+
+/* —— Arena stage iron frame —— */
+[data-med-arena] .arena-stage {
+  border: 2px solid var(--castle-edge-bright);
+  border-radius: 8px;
+  background: #000;
+}
+
+[data-med-arena] .arena-wrap {
+  background: #050403;
+}
+
+[data-med-arena] .arena-wrap canvas {
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 2px var(--castle-edge),
+    0 12px 40px #000000aa !important;
+}
+
+/* —— Result: KO parchment (solid) —— */
+[data-med-arena] .g-result,
+[data-med-arena] .med-result,
+[data-med-arena] .med-ko-panel {
+  margin: 8px 0;
+}
+
+[data-med-arena] .g-result-frame,
+[data-med-arena] .med-ko-parchment {
+  border-radius: 8px !important;
+  border: 2px solid var(--castle-edge-bright) !important;
+  background: var(--castle-panel) !important;
+  overflow: hidden;
+  box-shadow: 0 16px 40px #00000099 !important;
+  position: relative;
+}
+
+[data-med-arena] .g-result-banner,
+[data-med-arena] .med-ko-seal,
+[data-med-arena] .med-ko-banner {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  font-size: clamp(1.6rem, 6vw, 2.4rem);
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  padding: 18px 14px 14px;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--castle-gold-dim);
+  font-family: inherit;
+}
+
+[data-med-arena] .g-result.is-win .g-result-banner,
+[data-med-arena] .med-result.is-win .med-ko-seal,
+[data-med-arena] .med-ko-banner.is-win,
+[data-med-arena] .g-result.is-win .med-ko-banner {
+  background: #1a3a22 !important;
+  color: var(--castle-gold-hi) !important;
+  text-shadow: 0 2px 0 #000 !important;
+}
+
+[data-med-arena] .g-result.is-lose .g-result-banner,
+[data-med-arena] .med-result.is-lose .med-ko-seal,
+[data-med-arena] .med-ko-banner.is-lose,
+[data-med-arena] .g-result.is-lose .med-ko-banner {
+  background: var(--castle-blood) !important;
+  color: #f5c4c4 !important;
+  text-shadow: 0 2px 0 #000 !important;
+  border-bottom-color: #4a1010;
+}
+
+[data-med-arena] .g-result-banner::after,
+[data-med-arena] .med-ko-banner::after {
+  content: '— KO —';
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.4em;
+  margin-top: 6px;
+  color: var(--castle-parchment-dim);
+  font-weight: 800;
+}
+
+[data-med-arena] .g-result-body {
+  position: relative;
+  z-index: 1;
+}
+
+[data-med-arena] .g-result-art {
+  border-radius: 6px !important;
+  border: 2px solid var(--castle-edge-bright) !important;
+  background: #120e0a !important;
+}
+
+[data-med-arena] .g-result.is-win .g-result-art {
+  border-color: var(--castle-gold) !important;
+}
+
+[data-med-arena] .g-result.is-lose .g-result-art {
+  border-color: var(--castle-crimson) !important;
+}
+
+[data-med-arena] .g-result-line {
+  color: var(--castle-parchment) !important;
+  font-style: italic;
+}
+
+[data-med-arena] .g-result-vs {
+  color: var(--castle-mute) !important;
+}
+
+[data-med-arena] .g-result-vs span {
+  color: var(--castle-crimson-hi) !important;
+}
+
+[data-med-arena] .g-result-money {
+  color: var(--castle-gold-hi) !important;
+}
+
+[data-med-arena] .g-result-money.muted {
+  color: var(--castle-mute) !important;
+}
+
+[data-med-arena] .g-result-note {
+  color: var(--castle-mute) !important;
+}
+
+[data-med-arena] .g-result-actions {
+  position: relative;
+  z-index: 1;
+}
+
+[data-med-arena] .g-result-btn.btn-ok,
+[data-med-arena] .g-result-actions .btn-ok,
+[data-med-arena] .med-decree {
+  background: var(--castle-gold) !important;
+  border: 2px solid var(--castle-gold-dim) !important;
+  color: var(--castle-ink) !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-radius: 4px !important;
+}
+
+[data-med-arena] .g-result-btn:not(.btn-ok) {
+  border: 2px solid var(--castle-edge) !important;
+  background: var(--castle-panel) !important;
+  color: var(--castle-parchment) !important;
+  border-radius: 4px !important;
+}
+
+/* —— Moves —— */
+[data-med-arena] .g-moves-list li {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+  border-radius: 6px;
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .g-moves-dot {
+  background: var(--castle-gold);
+  box-shadow: none;
+}
+
+[data-med-arena] .g-moves-dot.is-trait {
+  background: var(--castle-crimson-hi);
+}
+
+[data-med-arena] .g-moves-foot kbd {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge-bright);
+  color: var(--castle-gold-hi);
+  border-radius: 4px;
+}
+
+[data-med-arena] .g-moves-foot-l {
+  color: var(--castle-gold);
+}
+
+[data-med-arena] .g-moves-trait-line {
+  font-size: 12px;
+  color: var(--castle-parchment-dim);
+}
+
+/* —— Buttons (arena context) —— */
+[data-med-arena] .btn {
+  border-radius: 6px;
+}
+
+[data-med-arena] .btn-primary,
+[data-med-arena] .riddle-btn-primary {
+  background: var(--castle-crimson);
+  border-color: var(--castle-blood);
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .btn-ok {
+  background: var(--castle-gold) !important;
+  border-color: var(--castle-gold-dim) !important;
+  color: var(--castle-ink) !important;
+}
+
+[data-med-arena] .btn-danger {
+  background: var(--castle-crimson);
+  border-color: var(--castle-blood);
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .btn-ghost {
+  border-color: var(--castle-edge);
+  color: var(--castle-parchment-dim);
+}
+
+[data-med-arena] .btn:focus-visible,
+[data-med-arena] button:focus-visible,
+[data-med-arena] a:focus-visible {
+  outline: 2px solid var(--castle-gold-hi) !important;
+  outline-offset: 2px;
+}
+
+[data-med-arena] .chip {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+  color: var(--castle-parchment-dim);
+  border-radius: 4px;
+}
+
+[data-med-arena] .chip strong {
+  color: var(--castle-gold-hi);
+}
+
+[data-med-arena] .chip.win,
+[data-med-arena] .chip.win strong {
+  border-color: #2a4a34;
+  color: #8fca9a;
+}
+
+[data-med-arena] .chip.lose,
+[data-med-arena] .chip.lose strong {
+  border-color: var(--castle-crimson);
+  color: var(--castle-crimson-hi);
+}
+
+[data-med-arena] .streak-chip,
+[data-med-arena] .streak-callout {
+  color: var(--castle-gold-hi) !important;
+  border-color: var(--castle-gold-dim) !important;
+}
+
+/* —— Touch + PS pads: iron —— */
+[data-med-arena] .ps-d {
+  background: #1c1914;
+  border-color: #4a4034;
+  color: var(--castle-parchment);
+  border-radius: 4px;
+}
+
+[data-med-arena] .ps-d:active {
+  background: var(--castle-gold-dim);
+  color: var(--castle-ink);
+}
+
+[data-med-arena] .ps-d.center {
+  background: #12100c;
+  border-color: #2a2620;
+  color: #4a4034;
+}
+
+[data-med-arena] .ps-f {
+  background: #14110e;
+}
+
+[data-med-arena] .ps-f.tri {
+  border-color: var(--castle-gold);
+  color: var(--castle-gold-hi);
+}
+
+[data-med-arena] .ps-f.cir {
+  border-color: var(--castle-crimson-hi);
+  color: var(--castle-crimson-hi);
+}
+
+[data-med-arena] .ps-f.x {
+  border-color: #8a9eb8;
+  color: #a8bdd4;
+}
+
+[data-med-arena] .ps-f.sq {
+  border-color: var(--castle-parchment-dim);
+  color: var(--castle-parchment-dim);
+}
+
+[data-med-arena] .ps-f:active {
+  background: currentColor;
+  color: #0a0806;
+}
+
+[data-med-arena] .ps-l2,
+[data-med-arena] .ps-r2 {
+  background: #1c1914;
+  border-color: #4a4034;
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .ps-l2 span,
+[data-med-arena] .ps-r2 span {
+  color: var(--castle-mute);
+}
+
+[data-med-arena] .ps-l2:active,
+[data-med-arena] .ps-r2:active {
+  background: var(--castle-gold-dim);
+  border-color: var(--castle-gold);
+  color: var(--castle-ink);
+}
+
+[data-med-arena] .ps-hint {
+  color: var(--castle-mute);
+  text-shadow: 0 1px 2px #000;
+}
+
+[data-med-arena] .pad-btn {
+  background: #1c1914;
+  border-color: #4a4034;
+  color: var(--castle-parchment);
+  border-radius: 8px;
+}
+
+[data-med-arena] .pad-btn.special {
+  border-color: var(--castle-gold);
+  color: var(--castle-gold-hi);
+}
+
+[data-med-arena] .pad-btn:active {
+  background: var(--castle-crimson);
+  border-color: var(--castle-gold);
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .touch-dual .touch {
+  border-color: var(--castle-edge);
+  background: var(--castle-panel);
+}
+
+[data-med-arena] .fight-legend-toggle {
+  background: var(--castle-panel);
+  border-color: var(--castle-edge);
+  color: var(--castle-parchment);
+}
+
+[data-med-arena] .fight-legend-panel {
+  background: var(--castle-ink);
+  border-color: var(--castle-edge);
+}
+
+[data-med-arena] .fight-control-legend kbd {
+  background: var(--castle-panel);
+  border-color: var(--castle-edge);
+  color: var(--castle-gold-hi);
+}
+
+/* —— Mode cards (legacy g-mode) —— */
+[data-med-arena] .g-mode-card {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+}
+
+[data-med-arena] .g-mode-card.is-on {
+  border-color: var(--castle-gold);
+  background: #1c160a;
+  box-shadow: inset 0 0 0 1px var(--castle-gold-dim);
+}
+
+[data-med-arena] .g-mode-card.is-on .g-mode-icon {
+  background: #2a2008;
+  border-color: var(--castle-gold);
+}
+
+[data-med-arena] .g-mode-check {
+  color: var(--castle-gold-hi);
+}
+
+/* —— Tutorial / heat —— */
+[data-med-arena] .tutorial-banner {
+  background: #1a160c !important;
+  border: 1px solid var(--castle-gold-dim) !important;
+  color: var(--castle-parchment) !important;
+  border-radius: 8px;
+}
+
+[data-med-arena] .heat-bar {
+  background: var(--castle-iron);
+  border: 1px solid var(--castle-edge);
+}
+
+[data-med-arena] .heat-bar i {
+  background: var(--castle-crimson) !important;
+  box-shadow: none !important;
+}
+
+/* —— Hero (g-hero legacy) —— */
+[data-med-arena] .g-hero-frame {
+  background: var(--castle-panel);
+  border-color: var(--castle-edge-bright);
+}
+
+[data-med-arena] .g-hero-frame::before {
+  background: transparent;
+}
+
+[data-med-arena] .g-hero-word {
+  color: var(--castle-parchment);
+  text-shadow: 0 2px 0 #1a140c;
+}
+
+[data-med-arena] .g-hero-word-accent {
+  color: var(--castle-gold-hi);
+  text-shadow: 0 2px 0 #1a140c;
+}
+
+[data-med-arena] .g-hero-stat {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+}
+
+[data-med-arena] .g-hero-stat-v em {
+  color: var(--castle-gold-hi);
+}
+
+/* —— Connect / wallet / fields —— */
+[data-med-arena] .fd-connect-panel {
+  border: 1px solid var(--castle-edge);
+  background: var(--castle-iron);
+  border-radius: 8px;
+}
+
+[data-med-arena] .quote b {
+  color: var(--castle-gold-hi);
+}
+
+[data-med-arena] .field input:focus,
+[data-med-arena] .field select:focus {
+  border-color: var(--castle-gold);
+}
+
+[data-med-arena] .field input,
+[data-med-arena] .field select {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+  color: var(--castle-text);
+}
+
+/* —— Lands rail —— */
+[data-med-arena] .lands-rail__card {
+  border-color: var(--castle-edge);
+  background: var(--castle-iron);
+}
+
+[data-med-arena] .lands-rail__media {
+  background: #120e0a;
+}
+
+/* —— History —— */
+[data-med-arena] .history li {
+  background: var(--castle-iron);
+  border-color: var(--castle-edge);
+}
+
+[data-med-arena] .history .won {
+  color: #8fca9a;
+}
+
+[data-med-arena] .history .lost {
+  color: var(--castle-crimson-hi);
+}
+
+/* —— Skip link: gold focus —— */
+[data-med-arena] .skip-to-main:focus,
+[data-med-arena] .skip-to-main:focus-visible {
+  box-shadow: 0 0 0 2px var(--castle-gold), 0 10px 15px -3px rgb(0 0 0 / 0.3);
+}
+
+/* Lobby wrappers */
+.med-lobby-wrap,
+.med-result-wrap {
+  display: contents;
+}
+
+/* —— Screen fight: tighter, darker —— */
+[data-med-arena][data-screen='fight'] .app-main {
+  gap: 8px;
+}
+
+[data-med-arena][data-screen='fight'] .g-fight-shell {
+  border-color: var(--castle-gold-dim);
+}

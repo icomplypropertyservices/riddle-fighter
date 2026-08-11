@@ -22,10 +22,13 @@ const SESSION_ALIAS_KEYS = [
   'rf_wallet_source',
 ] as const
 
-/** Public ops — never “logged in as”. */
+/**
+ * Public ops / issuers — never “logged in as”.
+ * NOTE: rDiHMc… is a real player wallet for suite games (lands/humans holder).
+ * Do NOT ban it as the player — only ban pure treasury / collection issuers.
+ */
 const NEVER_PLAYER = new Set(
   [
-    'rDiHMcZARsb1uakt8tYScLbZuLRihZqjMp', // game mint
     'rEwUuTNY3TaXAJL6T4y1tjkAnY7JPdX3dB', // treasury
     'rp5DGDDFZdQswWfn3sgkQznCAj9SkkCMLH', // collection issuer
     'rpHshLWWWJoitkWBAJVBpyBdQq425XE77C', // legacy fee
@@ -81,15 +84,14 @@ function expireSuiteCookies(): void {
 function storageLooksBad(raw: string | null | undefined): boolean {
   if (!raw) return false
   if (/rHvuNQ88/i.test(raw)) return true
-  if (/rDiHMcZARsb1uakt8tYScLbZuLRihZqjMp/i.test(raw)) return true
-  if (/rEwUuTNY3TaXAJL6T4y1tjkAnY7JPdX3dB/i.test(raw)) return true
   try {
     const j = JSON.parse(raw) as Record<string, unknown>
     const accounts = (j.accounts || j.wallets || {}) as Record<string, string>
     const addr = String(
       j.address || j.xrpl || j.wallet || accounts.xrpl || accounts.XRPL || '',
     ).trim()
-    return !acceptPlayerAddress(addr) && addr.startsWith('r')
+    // Only bad if primary address is present and rejected (ops / poison)
+    return addr.startsWith('r') && !acceptPlayerAddress(addr)
   } catch {
     return false
   }

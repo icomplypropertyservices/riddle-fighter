@@ -8,7 +8,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ACCOUNT_URL,
+  CREDITS_URL,
   APP_LABELS,
   SUITE_CHROME_VERSION,
   SUITE_MORE_LABEL,
@@ -108,8 +108,8 @@ function SuiteMoreMenu({ current }: { current: SuiteShellAppId }) {
 }
 
 function formatCredits(n: number): string {
-  if (!Number.isFinite(n) || n <= 0) return '0'
-  return n.toLocaleString('en-US')
+  if (!Number.isFinite(n) || n < 0) return '0'
+  return Math.floor(n).toLocaleString('en-US')
 }
 
 const TIER_DOT: Record<string, string> = {
@@ -119,23 +119,26 @@ const TIER_DOT: Record<string, string> = {
   gold: '#facc15',
 }
 
+/** Always-visible suite credits chip — every header, including 0 cr. */
 function SuiteCreditsChip() {
   const { balance, loading } = useSuiteCredits()
   const { tier } = useSuiteTier()
   const dot = TIER_DOT[tier] || TIER_DOT.free
 
-  const label = useMemo(() => {
-    if (loading) return '…'
-    if (balance > 0) return `${formatCredits(balance)} cr`
-    return null
+  const crLabel = useMemo(() => {
+    if (loading) return '… cr'
+    return `${formatCredits(balance)} cr`
   }, [balance, loading])
 
   return (
     <a
-      href={ACCOUNT_URL}
+      href={CREDITS_URL}
       className="rw-suite-header__credits"
-      title="Riddle account & credits"
+      title="Suite credits · 100 cr = $1 · top up in Wallet"
+      aria-label={`Suite credits ${crLabel}, ${tier} tier`}
       data-testid="suite-credits-chip"
+      data-suite-credits={loading ? undefined : String(Math.max(0, Math.floor(balance)))}
+      data-suite-tier={tier}
     >
       <span
         className="rw-suite-header__credits-dot"
@@ -143,9 +146,7 @@ function SuiteCreditsChip() {
         aria-hidden
       />
       <span className="rw-suite-header__credits-tier">{tier}</span>
-      {label ? (
-        <span className="rw-suite-header__credits-balance">{label}</span>
-      ) : null}
+      <span className="rw-suite-header__credits-balance">{crLabel}</span>
     </a>
   )
 }
@@ -159,10 +160,13 @@ export function UnifiedSuiteHeader({
   hidePills = false,
   address,
   showSocialRail = false,
-  showCredits = true,
+  // Credits chip is mandatory on every suite header (cannot be opted out).
+  showCredits: _showCredits = true,
   showAccount = true,
   logoSrc = 'https://wallet.riddlewallet.com/rdllogo-40.png',
 }: UnifiedSuiteHeaderProps) {
+  const showCredits = true
+  void _showCredits
   const sub = (appLabel || APP_LABELS[current] || 'RIDDLE').toUpperCase()
   const homeHref =
     current === 'hub' ? SUITE_SHELL_URLS.hub : SUITE_SHELL_URLS[current] || SUITE_SHELL_URLS.hub
@@ -202,29 +206,39 @@ export function UnifiedSuiteHeader({
         </a>
 
         {!hidePills ? (
-          <nav
-            className="rw-suite-header__pills"
-            aria-label="Riddle suite apps"
-          >
-            <div className="rw-suite-header__pills-inner">
-              {SUITE_PRIMARY_PILLS.map((p) => {
-                const active = p.id === current
-                return (
-                  <a
-                    key={p.id}
-                    href={p.href}
-                    aria-current={active ? 'page' : undefined}
-                    data-suite-pill={p.id}
-                    data-active={active ? '1' : '0'}
-                    className="rw-suite-header__pill"
-                  >
-                    {p.label}
-                  </a>
-                )
-              })}
-              <SuiteMoreMenu current={current} />
-            </div>
-          </nav>
+          <>
+            <nav
+              className="rw-suite-header__pills"
+              aria-label="Riddle suite apps"
+            >
+              <div className="rw-suite-header__pills-inner">
+                {SUITE_PRIMARY_PILLS.map((p) => {
+                  const active = p.id === current
+                  return (
+                    <a
+                      key={p.id}
+                      href={p.href}
+                      aria-current={active ? 'page' : undefined}
+                      data-suite-pill={p.id}
+                      data-active={active ? '1' : '0'}
+                      className="rw-suite-header__pill"
+                    >
+                      {p.label}
+                    </a>
+                  )
+                })}
+              </div>
+            </nav>
+            {/*
+              Deliberately a sibling of the pills nav, not a child of it.
+              `.rw-suite-header__pills` sets overflow-x:auto for pill
+              scrolling, and a scroll container clips BOTH axes (overflow-y
+              computes to auto), so an absolutely-positioned dropdown rendered
+              inside it was clipped away — the button toggled but nothing was
+              visible. Out here it can overhang the header.
+            */}
+            <SuiteMoreMenu current={current} />
+          </>
         ) : null}
 
         {showCredits || showAccount || rightSlot ? (
@@ -254,7 +268,10 @@ export function UnifiedSuiteHeader({
   )
 }
 
-/** Spacer matches fixed header. Default 44px; expands when rail/subRow is shown. */
+/**
+ * Spacer for legacy layouts that reserved room under a fixed header.
+ * Header is now in-flow (scrolls with the page) — spacer is a zero-height no-op.
+ */
 export function SuiteHeaderSpacer({
   hasSubRow = false,
   className = '',
@@ -262,6 +279,7 @@ export function SuiteHeaderSpacer({
   hasSubRow?: boolean
   className?: string
 }) {
+  void hasSubRow
   return (
     <div
       aria-hidden
@@ -269,13 +287,14 @@ export function SuiteHeaderSpacer({
       data-suite-header-spacer="1"
       data-suite-chrome-version={SUITE_CHROME_VERSION}
       style={{
-        height: hasSubRow
-          ? 'var(--suite-header-h, calc(84px + env(safe-area-inset-top, 0px)))'
-          : 'calc(44px + env(safe-area-inset-top, 0px))',
-        minHeight: hasSubRow
-          ? 'var(--suite-header-h, calc(84px + env(safe-area-inset-top, 0px)))'
-          : 'calc(44px + env(safe-area-inset-top, 0px))',
+        height: 0,
+        minHeight: 0,
+        maxHeight: 0,
+        overflow: 'hidden',
+        margin: 0,
+        padding: 0,
         flexShrink: 0,
+        pointerEvents: 'none',
       }}
     />
   )

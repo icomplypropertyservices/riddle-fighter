@@ -48,6 +48,7 @@ import {
   type True2dContext,
 } from './render'
 import { preloadAllCharacterBodies } from '../lib/characterBodies'
+import { ensureFramePacksBaked } from './render/frameBake'
 
 export type Side = 'p1' | 'p2'
 
@@ -84,6 +85,8 @@ export type FighterState = {
   status: { kind: StatusKind; ticks: number; power: number } | null
   /** True after first successful unblocked hit this combo starter window */
   openedCombo: boolean
+  /** Absolute walk speed (px/frame) — drives leg/arm walk clip in renderer */
+  walkSpeed: number
 }
 
 export type InputState = {
@@ -161,19 +164,22 @@ export { DESIGNER_ROSTER }
 export const CANVAS_W = 960
 export const CANVAS_H = 540
 const GROUND = 420
-/** Nintendo-style float: softer gravity, readable jumps (not frantic). */
-const GRAVITY = 0.62
-const WALK = 2.65
-const JUMP_V = -11.2
-const DASH = 5.4
-/** Global damage scale — rounds last longer (Smash-like). */
-const DMG_SCALE = 0.52
+/**
+ * Realistic SF-style physics (upgraded feel):
+ * weighty gravity, snappy walk, readable jump, spaced damage.
+ */
+const GRAVITY = 0.72
+const WALK = 2.85
+const JUMP_V = -12.0
+const DASH = 5.8
+/** Global damage — NFT atk/def still dominate after this scale. */
+const DMG_SCALE = 0.58
 /** Max combo hits before forced drop (prevents infinite mash). */
-const MAX_COMBO = 5
+const MAX_COMBO = 6
 /** Frames after recovery where a pressed attack still fires (forgiving buffer). */
-const INPUT_BUFFER_FRAMES = 10
-/** Base HP multiplier for all fighters — matches take real time. */
-const HP_SCALE = 1.55
+const INPUT_BUFFER_FRAMES = 12
+/** Base HP multiplier — longer rounds so NFT traits matter mid-match. */
+const HP_SCALE = 1.72
 
 export function emptyInput(): InputState {
   return {
@@ -271,8 +277,9 @@ export class FightEngine {
     }
     if (a.image) void loadNftSprite(a.image)
     if (b.image) void loadNftSprite(b.image)
-    // Actual painted character bodies (side-view sprites)
+    // Character bodies + multi-frame walk/attack packs (Phase 3 sheets)
     preloadAllCharacterBodies()
+    void ensureFramePacksBaked()
     void preloadStage(this.stageId)
     void preloadAllStages()
     void preloadKoFx()
@@ -390,6 +397,7 @@ export class FightEngine {
 
     if (this.hitstop > 0) {
       this.hitstop--
+      // Still draw during hitstop (frozen sim = impact freeze)
       return
     }
 
@@ -657,13 +665,28 @@ export class FightEngine {
       (0.88 + self.fighter.stats.speed / 42) *
       pow.walkMult *
       (self.crouch ? 0.55 : 1)
+    let moved = 0
     if (!self.attackKind && !self.blocking) {
-      if (input.left) self.x -= speed
-      if (input.right) self.x += speed
+      if (input.left) {
+        self.x -= speed
+        moved -= speed
+      }
+      if (input.right) {
+        self.x += speed
+        moved += speed
+      }
     } else if (self.blocking) {
-      if (input.left) self.x -= speed * 0.28
-      if (input.right) self.x += speed * 0.28
+      if (input.left) {
+        self.x -= speed * 0.28
+        moved -= speed * 0.28
+      }
+      if (input.right) {
+        self.x += speed * 0.28
+        moved += speed * 0.28
+      }
     }
+    // Renderer uses walkSpeed for leg/arm gait; face() sets facing toward opponent every tick
+    self.walkSpeed = Math.abs(moved)
 
     if (self.attackKind === 'dash' && self.attackFrame < 8) {
       self.x += self.facing * DASH * pow.walkMult
@@ -817,10 +840,20 @@ export class FightEngine {
       atk.attackKind === 'secret' ||
       atk.attackKind === 'super' ||
       atk.attackKind === 'special'
+    // NFT power level + resolved stats drive real damage differences
+    const nftPow = Math.max(
+      8,
+      Number(atk.fighter.powerLevel) ||
+        (atk.fighter.stats.atk +
+          atk.fighter.stats.special * 0.5 +
+          atk.fighter.stats.speed * 0.25) /
+          1.5,
+    )
+    const nftScale = 0.85 + Math.min(0.65, nftPow / 100)
     const base =
       isSpecial
-        ? atk.fighter.stats.special * mult * 0.85 * ap.specialDamageMult
-        : atk.fighter.stats.atk * mult * ap.damageMult
+        ? atk.fighter.stats.special * mult * 0.9 * ap.specialDamageMult * nftScale
+        : atk.fighter.stats.atk * mult * ap.damageMult * nftScale
     const elBonus = elementMatchup(
       ap.element || atk.fighter.identity?.element,
       dp.element || def.fighter.identity?.element,
@@ -828,8 +861,8 @@ export class FightEngine {
     // Armor pen from traits ignores portion of DEF
     const effDef = def.fighter.stats.def * (1 - ap.armorPen) * dp.multDef
     let dmg = Math.max(
-      3,
-      Math.floor((base * elBonus - effDef * 0.28) * DMG_SCALE),
+      4,
+      Math.floor((base * elBonus - effDef * 0.32) * DMG_SCALE),
     )
     // Crit
     let didCrit = false
@@ -1066,6 +1099,29 @@ export class FightEngine {
       CANVAS_W,
       CANVAS_H,
     )
+
+    // Super freeze: desaturate stage during secret/super active startup
+    const superFreeze =
+      (this.p1.attackKind === 'secret' ||
+        this.p1.attackKind === 'super' ||
+        this.p2.attackKind === 'secret' ||
+        this.p2.attackKind === 'super') &&
+      (this.p1.attackFrame < 8 || this.p2.attackFrame < 8)
+    if (superFreeze || this.hitstop > 4) {
+      ctx.save()
+      ctx.fillStyle = superFreeze
+        ? 'rgba(8,6,18,0.38)'
+        : `rgba(255,255,255,${Math.min(0.12, this.hitstop / 80)})`
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+      if (superFreeze) {
+        ctx.globalCompositeOperation = 'saturation'
+        ctx.fillStyle = 'rgba(120,120,140,0.55)'
+        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+        ctx.globalCompositeOperation = 'source-over'
+      }
+      ctx.restore()
+    }
+
     // Soft color afterimages (engine trail) under full body ghosts drawn by fighter renderer
     for (const a of this.afterimages) {
       const t = a.life / 10
@@ -1076,6 +1132,21 @@ export class FightEngine {
       ctx.fill()
     }
     ctx.globalAlpha = 1
+
+    // Victory pose: winner holds arms up on match_end
+    if (this.phase === 'match_end' && this.winner) {
+      const win = this.winner === 'p1' ? this.p1 : this.p2
+      const lose = this.winner === 'p1' ? this.p2 : this.p1
+      win.attackKind = null
+      win.crouch = false
+      win.blocking = false
+      win.dead = false
+      // Force idle with elevated arms via temporary banner flag
+      win.lastMoveName = 'VICTORY'
+      win.lastMoveBanner = 40
+      lose.dead = true
+    }
+
     drawFighter(ctx, this.p1, this.frame)
     drawFighter(ctx, this.p2, this.frame)
     drawVfx(ctx, this.particles)
@@ -1083,7 +1154,31 @@ export class FightEngine {
     if (this.phase === 'ko' || this.phase === 'match_end' || this.phase === 'finish') {
       drawKoBurst(ctx, this.frame, this.koT)
     }
+    if (this.phase === 'match_end' && this.winner) {
+      this.drawVictoryBanner(ctx)
+    }
     drawHud(ctx, this)
+    ctx.restore()
+  }
+
+  private drawVictoryBanner(ctx: CanvasRenderingContext2D): void {
+    const t = Math.min(1, (90 - Math.min(90, this.koT || 90)) / 20)
+    ctx.save()
+    ctx.globalAlpha = 0.35 + t * 0.5
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'
+    ctx.fillRect(0, CANVAS_H * 0.38, CANVAS_W, 72)
+    ctx.textAlign = 'center'
+    ctx.font = 'bold 42px system-ui,Segoe UI,sans-serif'
+    ctx.fillStyle = '#fde68a'
+    ctx.shadowColor = '#fbbf24'
+    ctx.shadowBlur = 18
+    const name =
+      this.winner === 'p1' ? this.p1.fighter.name : this.p2.fighter.name
+    ctx.fillText('WINNER', CANVAS_W / 2, CANVAS_H * 0.38 + 32)
+    ctx.font = 'bold 22px system-ui,Segoe UI,sans-serif'
+    ctx.fillStyle = '#f4f4f8'
+    ctx.shadowBlur = 8
+    ctx.fillText(name.slice(0, 22), CANVAS_W / 2, CANVAS_H * 0.38 + 58)
     ctx.restore()
   }
 
@@ -1175,6 +1270,7 @@ function makeState(f: Fighter, x: number, facing: 1 | -1): FighterState {
     powers,
     status: null,
     openedCombo: false,
+    walkSpeed: 0,
   }
 }
 

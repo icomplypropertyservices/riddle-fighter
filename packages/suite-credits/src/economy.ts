@@ -512,6 +512,21 @@ export function parsePaygMemo(
   return { ok: true, sku, projectId, raw };
 }
 
+/**
+ * Node's Buffer, read off globalThis rather than referenced as a bare global.
+ *
+ * This package ships to browser apps (Vite + Next) that do not install
+ * @types/node, where a bare `Buffer` is a hard TS2580 and broke their builds.
+ * Runtime behaviour is identical — same object, just typed locally. Both call
+ * sites below are unreachable in a browser (TextEncoder/TextDecoder win).
+ */
+type NodeBufferLike = {
+  from(input: string, encoding: string): { toString(encoding: string): string };
+};
+function nodeBuffer(): NodeBufferLike | undefined {
+  return (globalThis as { Buffer?: NodeBufferLike }).Buffer;
+}
+
 /** Hex-encode UTF-8 memo for XRPL MemoData (no 0x prefix). */
 export function paygMemoToHex(memo: string): string {
   if (typeof TextEncoder !== 'undefined') {
@@ -521,7 +536,7 @@ export function paygMemoToHex(memo: string): string {
       .join('')
       .toUpperCase();
   }
-  return Buffer.from(memo, 'utf8').toString('hex').toUpperCase();
+  return (nodeBuffer()?.from(memo, 'utf8').toString('hex') ?? '').toUpperCase();
 }
 
 export function paygMemoFromHex(hex: string): string {
@@ -532,7 +547,7 @@ export function paygMemoFromHex(hex: string): string {
     );
     return new TextDecoder().decode(bytes);
   }
-  return Buffer.from(clean, 'hex').toString('utf8');
+  return nodeBuffer()?.from(clean, 'hex').toString('utf8') ?? '';
 }
 
 /** Unified credits granted when a PAYG SKU is verified (qty=1). */

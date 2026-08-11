@@ -10,6 +10,8 @@ export { CLIPS, sampleClip } from './poseLibrary'
 export {
   getCollectionLook,
   resolveCollectionId,
+  LOOKS,
+  LOOKS_FOR_BAKE,
   type CollectionLook,
   type FighterCollectionId,
 } from './collectionLooks'
@@ -21,4 +23,12 @@ export {
   type True2dContext,
 } from './true2dCanvas'
 export { drawStageTrue2d, STAGE_GROUND_Y } from './stageRenderer'
+export {
+  ensureFramePacksBaked,
+  getBakedFrame,
+  getBakedPack,
+  compositeWalkStrip,
+  type BakedClip,
+  type BakedPack,
+} from './frameBake'
 export type { AnimClipId, JointPose, FighterDrawInput } from './types'

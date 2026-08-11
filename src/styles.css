@@ -1,20 +1,23 @@
-﻿@import './suite-chrome.css';
-/* Riddle suite tokens — solid colors only (match Social / hub). */
+@import './suite-chrome.css';
+/* Riddle suite tokens � solid colors only (match Social / hub). */
 html,body{overflow-x:clip;max-width:100%}img,video,canvas,svg{max-width:100%;height:auto}
 
 :root {
   color-scheme: dark;
-  --riddle-bg: #07070c;
-  --riddle-card: #111118;
-  --riddle-border: #1f1f2e;
-  --riddle-text: #f4f4f8;
-  --riddle-muted: #8b8ba3;
-  --riddle-violet: #8b5cf6;
-  --riddle-fuchsia: #d946ef;
-  --riddle-cyan: #22d3ee;
-  --riddle-success: #34d399;
-  --riddle-warn: #fbbf24;
-  --riddle-danger: #f87171;
+  /* Medieval arena � gold / crimson primary (neon violet killed) */
+  --riddle-bg: #0a0806;
+  --riddle-card: #14100c;
+  --riddle-border: #3d2e1a;
+  --riddle-text: #f5ecd4;
+  --riddle-muted: #9a8b72;
+  --riddle-violet: #d4a017; /* remapped: gold (compat) */
+  --riddle-fuchsia: #f0c14b; /* remapped: gold-hi (compat) */
+  --riddle-cyan: #e8d5a3; /* remapped: parchment (compat) */
+  --riddle-success: #3d8b5a;
+  --riddle-warn: #f0c14b;
+  --riddle-danger: #c41e3a;
+  --riddle-gold: #d4a017;
+  --riddle-crimson: #8b1538;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -52,7 +55,7 @@ a {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  /* SuiteHeaderSpacer owns safe-area + 44px — do not double-count --safe-t */
+  /* SuiteHeaderSpacer owns safe-area + 44px � do not double-count --safe-t */
   /* Mobile-first padding; wider gutters on tablet+ */
   padding: 10px 10px 0;
   padding-left: max(10px, env(safe-area-inset-left, 0px));
@@ -82,7 +85,7 @@ a {
   outline: none;
 }
 
-/* Header rightSlot — keep ≤48% width without blowing mobile */
+/* Header rightSlot � keep =48% width without blowing mobile */
 .suite-header-actions {
   display: flex;
   align-items: center;
@@ -140,8 +143,8 @@ a {
   }
 }
 
-/* a11y: skip link (no Tailwind in fighter — mirror suite violet pill).
-   NEVER use clip/1px/sr-only — Playwright needs non-empty on-screen box and
+/* a11y: skip link (no Tailwind in fighter � mirror suite violet pill).
+   NEVER use clip/1px/sr-only � Playwright needs non-empty on-screen box and
    opacity > 0. Always fixed top-left above suite chrome; near-invisible until focus. */
 .skip-to-main {
   position: fixed !important;
@@ -163,7 +166,7 @@ a {
   white-space: nowrap;
   border: 0;
   border-radius: 0.375rem;
-  background: #7c3aed;
+  background: #c41e3a;
   color: #fff;
   font-size: 0.875rem;
   font-weight: 600;
@@ -184,7 +187,7 @@ a {
   outline: none;
 }
 
-/* —— Suite header (same spirit as Social) —— */
+/* �� Suite header (same spirit as Social) �� */
 .suite-header {
   display: flex;
   flex-wrap: wrap;
@@ -246,7 +249,7 @@ a {
   gap: 6px;
 }
 
-/* —— Suite footer (match Social layout) —— */
+/* �� Suite footer (match Social layout) �� */
 .suite-footer {
   margin-top: auto;
   border-top: 1px solid var(--riddle-border);
@@ -340,7 +343,7 @@ a {
   color: var(--riddle-cyan);
 }
 
-/* —— Chips / buttons solid —— */
+/* �� Chips / buttons solid �� */
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -376,10 +379,10 @@ a {
 
 .btn {
   appearance: none;
-  border: 1px solid var(--riddle-violet);
-  background: var(--riddle-violet);
-  color: #fff;
-  border-radius: 10px;
+  border: 2px solid #4a463c;
+  background: linear-gradient(180deg, #3a3428 0%, #242018 100%);
+  color: #e8d5a3;
+  border-radius: 3px;
   padding: 10px 14px;
   font-weight: 800;
   font-size: 13px;
@@ -396,6 +399,7 @@ a {
   pointer-events: auto;
   user-select: none;
   box-sizing: border-box;
+  letter-spacing: 0.04em;
 }
 
 a.btn {
@@ -405,7 +409,7 @@ a.btn {
 .btn:focus-visible,
 .btn-primary:focus-visible,
 .riddle-btn-primary:focus-visible {
-  outline: 2px solid #8b5cf6;
+  outline: 2px solid #d4a017;
   outline-offset: 2px;
 }
 
@@ -416,12 +420,12 @@ a.btn {
   pointer-events: none;
 }
 
-/* Solid primary (no gradient) */
+/* Solid primary — crimson iron (no neon) */
 .btn-primary,
 .riddle-btn-primary {
-  background: #7c3aed;
-  border-color: #6d28d9;
-  color: #fff;
+  background: linear-gradient(180deg, #a52a2a 0%, #5a1010 100%);
+  border-color: #8b1a1a;
+  color: #f5e6c8;
 }
 
 .btn-primary:hover:not(:disabled),
@@ -442,9 +446,9 @@ a.btn {
 }
 
 .btn-ok {
-  border-color: var(--riddle-success);
-  background: var(--riddle-success);
-  color: #0a0a0a;
+  border-color: #4a6b3a;
+  background: linear-gradient(180deg, #6a8f52 0%, #3a5528 100%);
+  color: #f0efe4;
 }
 
 .btn-sm {
@@ -570,7 +574,7 @@ a.btn {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Last minted lands — horizontal rail, no page blowout */
+/* Last minted lands � horizontal rail, no page blowout */
 .lands-rail {
   display: flex;
   gap: 10px;
@@ -762,15 +766,15 @@ a.btn {
   max-height: min(52dvh, 420px);
   object-fit: contain;
   display: block;
-  /* True 2D HD upscale (DPR pipeline) — never pixelate */
+  /* True 2D HD upscale (DPR pipeline) � never pixelate */
   image-rendering: auto;
   -ms-interpolation-mode: bicubic;
   touch-action: none;
   background: #050508;
   border-radius: 12px;
   box-shadow:
-    0 0 0 1px rgba(139, 92, 246, 0.25),
-    0 12px 40px rgba(0, 0, 0, 0.55);
+    0 0 0 2px rgba(61, 50, 38, 0.9),
+    0 12px 40px rgba(0, 0, 0, 0.7);
 }
 @media (min-width: 768px) {
   .arena-root {
@@ -802,22 +806,22 @@ a.btn {
   flex: 1 1 auto;
 }
 .app[data-screen='fight'] .arena-wrap {
-  max-height: min(calc(100dvh - 14rem), 560px);
+  max-height: min(calc(100dvh - 10rem), 72dvh);
 }
 .app[data-screen='fight'] .arena-wrap canvas {
-  max-height: min(calc(100dvh - 14rem), 560px);
+  max-height: min(calc(100dvh - 10rem), 72dvh);
 }
 @media (min-width: 768px) {
   .app[data-screen='fight'] .arena-wrap {
-    max-height: min(calc(100dvh - 12rem), 620px);
+    max-height: min(calc(100dvh - 8rem), 78dvh);
   }
   .app[data-screen='fight'] .arena-wrap canvas {
-    max-height: min(calc(100dvh - 12rem), 620px);
+    max-height: min(calc(100dvh - 8rem), 78dvh);
   }
 }
 
-/* —— PlayStation overlay ON TOP of fight ——
-   Thumb-ergonomic pads: ≥56px targets, safe-area, clear of HUD portraits */
+/* �� PlayStation overlay ON TOP of fight ��
+   Thumb-ergonomic pads: =56px targets, safe-area, clear of HUD portraits */
 .ps-overlay {
   position: absolute;
   inset: 0;
@@ -953,7 +957,7 @@ a.btn {
   padding: 10px 12px;
 }
 .fight-legend-toggle:focus-visible {
-  outline: 2px solid #8b5cf6;
+  outline: 2px solid #d4a017;
   outline-offset: 2px;
 }
 .fight-legend-panel {
@@ -1005,8 +1009,8 @@ a.btn {
 
 .ps-l2:active,
 .ps-r2:active {
-  background: #8b5cf6;
-  border-color: #8b5cf6;
+  background: #d4a017;
+  border-color: #d4a017;
   color: #fff;
 }
 
@@ -1017,7 +1021,7 @@ a.btn {
   gap: 10px;
 }
 
-/* D-pad cross — thumb floor ≥56px cells on phones */
+/* D-pad cross � thumb floor =56px cells on phones */
 .ps-dpad {
   display: grid;
   grid-template-columns: 56px 56px 56px;
@@ -1074,7 +1078,7 @@ a.btn {
   background: #52525b;
 }
 
-/* Face buttons diamond (PS layout) — ≥56px */
+/* Face buttons diamond (PS layout) � =56px */
 .ps-face {
   position: relative;
   width: 174px;
@@ -1136,7 +1140,7 @@ a.btn {
   text-shadow: 0 1px 2px #000;
 }
 
-/* Narrow phones: still ≥52px so dual pads fit without H-overflow */
+/* Narrow phones: still =52px so dual pads fit without H-overflow */
 @media (max-width: 399px) {
   .ps-dpad {
     width: 162px;
@@ -1230,7 +1234,7 @@ a.btn {
   gap: 6px;
 }
 
-/* Thumb-ergonomic floor ≥56px */
+/* Thumb-ergonomic floor =56px */
 .pad-btn {
   appearance: none;
   border: 1px solid var(--riddle-border);
@@ -1427,12 +1431,40 @@ body.fight-immersive {
 }
 
 body.fight-immersive .suite-header,
+body.fight-immersive .rw-suite-header,
 body.fight-immersive .suite-footer,
+body.fight-immersive .rw-suite-footer,
+body.fight-immersive .rw-suite-bottom-nav,
 body.fight-immersive .install-banner,
 body.fight-immersive .stats-row,
 body.fight-immersive .heat-bar,
-body.fight-immersive .tutorial-banner {
+body.fight-immersive .tutorial-banner,
+body.fight-immersive .skip-to-main,
+.app[data-screen='fight'] .suite-header,
+.app[data-screen='fight'] .rw-suite-header,
+.app[data-screen='fight'] .suite-footer,
+.app[data-screen='fight'] .rw-suite-footer,
+.app[data-screen='fight'] .rw-suite-bottom-nav,
+.app[data-screen='fight'] .install-banner,
+.app[data-screen='fight'] .heat-bar,
+.app[data-screen='fight'] .tutorial-banner {
   display: none !important;
+}
+
+/* Fight screen always fills viewport even before FS API */
+.app[data-screen='fight'] {
+  max-width: none !important;
+  height: 100dvh;
+  min-height: 100dvh;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: #000 !important;
+}
+.app[data-screen='fight'] .app-main {
+  height: 100%;
+  min-height: 100dvh;
+  padding: 0 !important;
+  gap: 0 !important;
 }
 
 body.fight-immersive .app {
@@ -1465,31 +1497,49 @@ body.fight-immersive .panel:has(.fight-shell) > .row {
 body.fight-immersive .fight-shell {
   flex: 1;
   min-height: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 body.fight-immersive .arena-stage {
   flex: 1;
   border: 0;
   border-radius: 0;
+  min-height: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 body.fight-immersive .arena-wrap {
   flex: 1;
   max-height: none;
+  width: 100%;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
 }
 
+/* True fight fullscreen: canvas fills the viewport */
 body.fight-immersive .arena-wrap canvas {
-  width: 100%;
-  height: 100%;
-  max-height: none;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  max-width: none !important;
   object-fit: contain;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* When browser FS API works, cover the full screen */
+html:fullscreen body.fight-immersive .arena-wrap canvas,
+html:-webkit-full-screen body.fight-immersive .arena-wrap canvas {
+  object-fit: cover;
 }
 
 body.fight-immersive .ps-overlay {
@@ -1509,7 +1559,7 @@ body.fight-immersive .fight-control-legend {
   }
 }
 
-/* —— NFT dual swatch + view (OLD|NEW) —— */
+/* �� NFT dual swatch + view (OLD|NEW) �� */
 .fighter-card-wrap {
   position: relative;
   display: flex;
@@ -1552,7 +1602,31 @@ body.fight-immersive .fight-control-legend {
   min-height: 36px;
 }
 
-/* —— Full NFT detail modal (public OLD|NEW + history) —— */
+/* �� Xaman SignIn QR on-page modal (no extra xumm.app tab) �� */
+.xaman-qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(7, 7, 12, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  overflow: auto;
+}
+
+.xaman-qr-sheet {
+  width: 100%;
+  max-width: 22rem;
+  text-align: center;
+  padding: 18px 16px;
+  border-radius: 16px;
+  border: 1px solid #3b2f6b;
+  background: #12101c;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+/* �� Full NFT detail modal (public OLD|NEW + history) �� */
 .nft-detail-overlay {
   position: fixed;
   inset: 0;
@@ -1695,7 +1769,7 @@ body.fight-immersive .fight-control-legend {
   font-size: 12px;
 }
 
-/* —— Result fun panel —— */
+/* �� Result fun panel �� */
 .result-panel.result-win {
   border-color: rgba(52, 211, 153, 0.45);
   box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.12);
@@ -1755,3 +1829,451 @@ body.fight-immersive .fight-control-legend {
 }
 
 
+
+/* -----------------------------------------------------------
+   NFT DETAIL v3 � compact dual art (nd-*)
+   ----------------------------------------------------------- */
+.nd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(7, 7, 12, 0.92);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  overflow: auto;
+}
+@media (min-width: 640px) {
+  .nd-overlay {
+    align-items: center;
+    padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  }
+}
+.nd-sheet {
+  width: 100%;
+  max-width: 26rem;
+  max-height: min(92dvh, 880px);
+  overflow: auto;
+  margin: 0;
+  border-radius: 16px 16px 0 0;
+  padding: 14px 14px max(16px, env(safe-area-inset-bottom));
+}
+@media (min-width: 640px) {
+  .nd-sheet {
+    border-radius: 16px;
+    padding: 16px;
+  }
+}
+.nd-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.nd-kicker {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8b8ba3;
+}
+.nd-head h2 {
+  margin: 4px 0 0;
+  font-size: 1.15rem;
+  line-height: 1.2;
+  word-break: break-word;
+}
+.nd-id {
+  margin: 4px 0 0;
+  font-size: 10px;
+  word-break: break-all;
+  color: #8b8ba3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.nd-dual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-width: 100%;
+}
+.nd-art-slot {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #1f1f2e;
+  background: #0a0a10;
+  /* Fit screen � never tall full-bleed portraits */
+  aspect-ratio: 1;
+  max-height: 140px;
+}
+.nd-art-slot.is-new {
+  border-color: rgba(139, 92, 246, 0.55);
+}
+.nd-art-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+.nd-art-tag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(7, 7, 12, 0.88);
+  border: 1px solid #1f1f2e;
+  color: #e2e8f0;
+}
+.nd-art-slot.is-new .nd-art-tag {
+  background: rgba(139, 92, 246, 0.9);
+  border-color: #d4a017;
+}
+.nd-art-ph {
+  width: 100%;
+  height: 100%;
+  min-height: 100px;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+.nd-cap {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #8b8ba3;
+}
+.nd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.nd-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #8b8ba3;
+  text-align: center;
+}
+@media (min-width: 480px) {
+  .nd-stats {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.nd-stats > div {
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1px solid #1f1f2e;
+  background: #0c0c14;
+}
+.nd-stats b {
+  display: block;
+  color: #f4f4f8;
+  font-size: 14px;
+  margin-top: 2px;
+}
+.nd-traits-wrap,
+.nd-history-wrap {
+  margin-top: 12px;
+}
+.nd-traits-wrap h3,
+.nd-history-wrap h3 {
+  font-size: 12px;
+  margin: 0 0 6px;
+  color: #8b8ba3;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.nd-traits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.nd-traits li {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 7px;
+  border-radius: 8px;
+  border: 1px solid #1f1f2e;
+  background: #0c0c14;
+  font-size: 11px;
+  min-width: 0;
+}
+.nd-traits li span {
+  color: #8b8ba3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nd-traits li b {
+  color: #f4f4f8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nd-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow: auto;
+}
+.nd-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #1f1f2e;
+  background: #0c0c14;
+  font-size: 12px;
+}
+.nd-history .won { color: #34d399; font-weight: 800; }
+.nd-history .lost { color: #f87171; font-weight: 800; }
+.nd-history-meta { color: #8b8ba3; font-size: 11px; }
+.nd-history-empty {
+  justify-content: center !important;
+  opacity: 0.7;
+}
+.nd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* ── Fight instructions overlay (desktop) ── */
+.fight-howto {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+}
+.fight-howto__card {
+  width: min(720px, 100%);
+  max-height: min(90dvh, 640px);
+  overflow: auto;
+  border-radius: 16px;
+  border: 1px solid #3d2e1a;
+  background: #14100c;
+  color: #f5ecd4;
+  padding: 18px 20px 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+.fight-howto__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.fight-howto__head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #f0c14b;
+}
+.fight-howto__go {
+  min-height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 10px;
+  background: #f0c14b;
+  color: #1c1410;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.fight-howto__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .fight-howto__grid { grid-template-columns: 1fr; }
+  .fight-howto { display: none; } /* mobile uses touch pads */
+}
+.fight-howto__col h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #f5ecd4;
+}
+.fight-howto__col ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 12px;
+  color: #9a8b72;
+  line-height: 1.55;
+}
+.fight-howto__col li { margin-bottom: 4px; }
+.fight-howto kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid #3d2e1a;
+  background: #0c0a08;
+  color: #f0c14b;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.fight-howto__stats {
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7dd3fc;
+  font-variant-numeric: tabular-nums;
+}
+.fight-howto__cpu {
+  margin: 0;
+  font-size: 12px;
+  color: #9a8b72;
+  line-height: 1.45;
+}
+.fight-howto__foot {
+  margin: 14px 0 0;
+  font-size: 11px;
+  color: #6b5d4a;
+  text-align: center;
+}
+
+/* Desktop key strip during fight */
+.fight-desktop-keys {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(96vw, 720px);
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(61, 46, 26, 0.9);
+  background: rgba(10, 8, 6, 0.82);
+  color: #9a8b72;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: auto;
+}
+.fight-desktop-keys kbd {
+  color: #f0c14b;
+  font-weight: 800;
+}
+.fight-desktop-keys__help {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #3d2e1a;
+  background: #1c1712;
+  color: #f0c14b;
+  font-weight: 900;
+  cursor: pointer;
+}
+@media (min-width: 900px) and (pointer: fine) {
+  .fight-desktop-keys { display: flex; }
+  body.fight-immersive .fight-desktop-keys { display: flex; }
+}
+
+/* NFT nameplates on stage */
+.fight-nft-tags {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+}
+.fight-nft-tag {
+  position: absolute;
+  top: 8px;
+  max-width: 42%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(10, 8, 6, 0.78);
+  border: 1px solid #3d2e1a;
+  color: #f5ecd4;
+}
+.fight-nft-tag span {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fight-nft-tag em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  color: #7dd3fc;
+  font-variant-numeric: tabular-nums;
+}
+.fight-nft-tag--p1 { left: 10px; }
+.fight-nft-tag--p2 { right: 10px; text-align: right; }
+
+
+/* NFT XP / upgrade panel */
+.nd-xp-panel {
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #3d2e1a;
+  background: #0c0a08;
+}
+.nd-xp-panel h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #f0c14b;
+}
+.nd-xp-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #1c1712;
+  overflow: hidden;
+  margin: 8px 0 6px;
+}
+.nd-xp-bar i {
+  display: block;
+  height: 100%;
+  background: #f0c14b;
+  border-radius: 999px;
+}
+.nd-traits {
+  max-height: 220px;
+  overflow: auto;
+}

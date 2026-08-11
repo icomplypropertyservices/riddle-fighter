@@ -25,8 +25,9 @@ export const SUITE = {
   swap: 'https://swap.riddlewallet.com',
   dev: 'https://dev.riddlewallet.com',
   social: import.meta.env.VITE_SOCIAL_URL || 'https://social.riddlewallet.com',
-  world: import.meta.env.VITE_WORLD_URL || 'https://reborn.riddlewallet.com',
-  reborn: 'https://reborn.riddlewallet.com',
+  /** Civilisations only — reborn.riddlewallet.com is retired */
+  world: import.meta.env.VITE_WORLD_URL || 'https://civ.riddlewallet.com',
+  civ: import.meta.env.VITE_CIV_URL || 'https://civ.riddlewallet.com',
   fighter: import.meta.env.VITE_FIGHTER_URL || 'https://fighter.riddlewallet.com',
   pay: 'https://pay.riddlewallet.com',
   creditsTopup: 'https://wallet.riddlewallet.com',
@@ -58,7 +59,8 @@ export const SUITE_NAV: { key: keyof typeof SUITE; label: string }[] = [
   { key: 'scanner', label: 'Scanner' },
   { key: 'dev', label: 'Dev' },
   { key: 'fighter', label: 'Fighter' },
-  { key: 'reborn', label: 'World' },
+  { key: 'civ', label: 'Civ' },
+  { key: 'city', label: 'Cities' },
 ]
 
 export const BRAND = {

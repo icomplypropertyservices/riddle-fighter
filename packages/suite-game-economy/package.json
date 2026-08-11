@@ -1,0 +1,10 @@
+{
+  "name": "@riddle/suite-game-economy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared game schemas: tournaments, wagers, suite credit fees/reasons across Cities/Fighter/Civ",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

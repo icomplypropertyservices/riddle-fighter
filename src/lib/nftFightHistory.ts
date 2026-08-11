@@ -165,8 +165,20 @@ export function publicNftViewUrl(nftId: string): string {
 export function readViewParam(): string | null {
   try {
     const q = new URLSearchParams(window.location.search)
-    const v = (q.get('view') || q.get('nft') || '').trim()
+    const v = (q.get('view') || q.get('nft') || q.get('nftId') || q.get('nft_id') || '').trim()
     return v || null
+  } catch {
+    return null
+  }
+}
+
+/** Deep-link owner wallet from Civ / Cities (?owner= or ?wallet=). */
+export function readOwnerParam(): string | null {
+  try {
+    const q = new URLSearchParams(window.location.search)
+    const o = (q.get('owner') || q.get('wallet') || q.get('address') || '').trim()
+    if (!o.startsWith('r') || o.length < 25) return null
+    return o
   } catch {
     return null
   }
@@ -175,9 +187,14 @@ export function readViewParam(): string | null {
 export function clearViewParam(): void {
   try {
     const u = new URL(window.location.href)
-    if (!u.searchParams.has('view') && !u.searchParams.has('nft')) return
-    u.searchParams.delete('view')
-    u.searchParams.delete('nft')
+    let dirty = false
+    for (const k of ['view', 'nft', 'nftId', 'nft_id']) {
+      if (u.searchParams.has(k)) {
+        u.searchParams.delete(k)
+        dirty = true
+      }
+    }
+    if (!dirty) return
     window.history.replaceState({}, '', u.pathname + u.search + u.hash)
   } catch {
     /* soft */

@@ -22,6 +22,26 @@ export function directAnim(p: FighterAnimState, frame: number): DirectedAnim {
     return { clipId: 'ko', t, pose: sampleClip(clip, Math.min(1, t)) }
   }
 
+  // Match-end victory arms
+  if (p.lastMoveName === 'VICTORY' && (p.lastMoveBanner || 0) > 0) {
+    const pose = sampleClip(CLIPS.secret, 0.55)
+    // Raise both arms
+    return {
+      clipId: 'idle',
+      t: 0.5,
+      pose: {
+        ...pose,
+        fShoulder: -120,
+        bShoulder: -110,
+        fElbow: 10,
+        bElbow: 15,
+        torso: -6,
+        rootY: -2,
+        scaleY: 1.04,
+      },
+    }
+  }
+
   if (p.hitstun > 0 && !p.attackKind) {
     const clip = CLIPS.hit
     const t = 1 - Math.min(1, p.hitstun / 14)
@@ -58,15 +78,18 @@ export function directAnim(p: FighterAnimState, frame: number): DirectedAnim {
 
   // Walk when moving on ground (engine supplies walkSpeed)
   const speed = Math.abs(p.walkSpeed ?? 0)
-  if (speed > 0.45) {
+  if (speed > 0.1 && !p.jump) {
     const clip = CLIPS.walk
-    // Phase advances with frame + speed for natural gait
-    const gait = (frame * (0.55 + Math.min(1.4, speed / 3))) % clip.length
+    // Gait speed tracks movement — legs cycle faster when sprinting
+    const rate = 1.05 + Math.min(2.2, speed / 1.8)
+    const gait = (frame * rate) % clip.length
     const t = gait / clip.length
-    return { clipId: 'walk', t, pose: sampleClip(clip, t) }
+    const pose = sampleClip(clip, t)
+    // Slight crouch-walk compression when holding down mid-walk (handled by crouch priority above)
+    return { clipId: 'walk', t, pose }
   }
 
-  // Idle breathing
+  // Idle breathing — continuous arm/leg micro-sway
   const clip = CLIPS.idle
   const t = (frame % clip.length) / clip.length
   return { clipId: 'idle', t, pose: sampleClip(clip, t) }

@@ -99,6 +99,34 @@ export function drawStageTrue2d(
       ctx.fill()
     }
     ctx.restore()
+
+    // Crowd silhouettes along rails (parallax slower than stage drift)
+    ctx.save()
+    ctx.globalAlpha = 0.22
+    ctx.fillStyle = '#0a0814'
+    for (let i = 0; i < 18; i++) {
+      const cx =
+        ((i * 58 + frame * 0.12) % (logicalW + 80)) - 40
+      const baseY = ground - 8
+      const h = 18 + (i % 5) * 4
+      // body
+      ctx.beginPath()
+      ctx.ellipse(cx, baseY - h * 0.55, 7 + (i % 3), h * 0.45, 0, 0, Math.PI * 2)
+      ctx.fill()
+      // head
+      ctx.beginPath()
+      ctx.arc(cx, baseY - h, 4.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.restore()
+
+    // Mid parallax haze strip
+    const mid = ctx.createLinearGradient(0, ground - 120, 0, ground - 40)
+    mid.addColorStop(0, 'transparent')
+    mid.addColorStop(0.5, 'rgba(99,102,241,0.06)')
+    mid.addColorStop(1, 'transparent')
+    ctx.fillStyle = mid
+    ctx.fillRect(0, ground - 120, logicalW, 80)
   } else {
     drawProceduralFallback(ctx, frame, ground, logicalW, logicalH)
   }

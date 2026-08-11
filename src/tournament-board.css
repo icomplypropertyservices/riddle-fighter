@@ -1,0 +1,365 @@
+/**
+ * Tournament board visuals — cool bracket + prize pool.
+ */
+
+.tb {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 0 24px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.tb-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid #3d2e1a;
+  background: #14100c;
+  padding: 16px 16px 14px;
+}
+.tb-hero__glow {
+  position: absolute;
+  inset: -40% -20% auto;
+  height: 120%;
+  background: radial-gradient(ellipse at 30% 0%, #f0c14b22, transparent 55%);
+  pointer-events: none;
+}
+.tb-hero__row {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.tb-kicker {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #f0c14b;
+}
+.tb-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 4.5vw, 1.75rem);
+  font-weight: 900;
+  color: #f5ecd4;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+.tb-sub {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #9a8b72;
+  font-weight: 600;
+}
+.tb-status {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid #3d2e1a;
+  background: #0c0a08;
+  color: #9a8b72;
+}
+.tb-status--live {
+  border-color: #8b1538;
+  background: #4a0a14;
+  color: #f5c4c4;
+}
+.tb-status--done {
+  border-color: #1f4d35;
+  background: #0f2a1c;
+  color: #6ee7b7;
+}
+.tb-status--registration {
+  border-color: #1e3a5f;
+  background: #0c1a2e;
+  color: #7dd3fc;
+}
+
+.tb-pool {
+  position: relative;
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (min-width: 640px) {
+  .tb-pool {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.tb-pool__cell {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #3d2e1a;
+  background: #0c0a08;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tb-pool__cell span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9a8b72;
+}
+.tb-pool__cell b {
+  font-size: 15px;
+  font-weight: 900;
+  color: #f5ecd4;
+  font-variant-numeric: tabular-nums;
+}
+.tb-pool__gold {
+  color: #f0c14b !important;
+}
+
+.tb-civs {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.tb-civ-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #3d2e1a;
+  background: #1a160c;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e8d5a3;
+}
+.tb-desc {
+  position: relative;
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #9a8b72;
+  line-height: 1.4;
+}
+.tb-champ {
+  position: relative;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #f0c14b66;
+  background: #2a2410;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: #f5ecd4;
+}
+.tb-champ span {
+  font-size: 11px;
+  font-weight: 800;
+  color: #f0c14b;
+}
+.tb-champ strong {
+  font-size: 16px;
+}
+.tb-champ em {
+  font-style: normal;
+  font-size: 12px;
+  color: #9a8b72;
+}
+
+/* Bracket columns */
+.tb-bracket {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.tb-round {
+  flex: 0 0 min(280px, 82vw);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tb-round__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f0c14b;
+  padding: 0 4px;
+}
+.tb-round__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: space-around;
+  min-height: 120px;
+}
+.tb-match {
+  border-radius: 14px;
+  border: 1px solid #3d2e1a;
+  background: #14100c;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tb-match.is-next {
+  border-color: #f0c14b;
+  box-shadow: 0 0 0 1px #f0c14b44;
+}
+.tb-match.is-done {
+  opacity: 0.92;
+}
+.tb-match__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a8b72;
+}
+.tb-match__label em {
+  font-style: normal;
+  color: #f0c14b;
+}
+.tb-match__label em.won {
+  color: #6ee7b7;
+}
+.tb-match__vs {
+  text-align: center;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: #6b5d4a;
+}
+
+.tb-seat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid #2a2218;
+  background: #0c0a08;
+  min-width: 0;
+}
+.tb-seat.is-you {
+  border-color: #f0c14b66;
+  background: #1a160c;
+}
+.tb-seat.is-win {
+  border-color: #1f4d35;
+}
+.tb-seat.is-out {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+.tb-seat__art {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #1c1712;
+  flex-shrink: 0;
+  border: 1px solid #3d2e1a;
+}
+.tb-seat__meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tb-seat__meta strong {
+  font-size: 12px;
+  color: #f5ecd4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tb-seat__civ {
+  font-size: 10px;
+  color: #e8d5a3;
+  font-weight: 650;
+}
+
+/* Roster */
+.tb-roster {
+  border-radius: 14px;
+  border: 1px solid #3d2e1a;
+  background: #14100c;
+  padding: 12px;
+}
+.tb-roster h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9a8b72;
+}
+.tb-roster__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.tb-roster__card {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid #2a2218;
+  background: #0c0a08;
+  min-width: 0;
+}
+.tb-roster__card.is-you {
+  border-color: #f0c14b55;
+}
+.tb-roster__card.is-out {
+  opacity: 0.4;
+}
+.tb-roster__img {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #1c1712;
+  flex-shrink: 0;
+}
+.tb-roster__card strong {
+  display: block;
+  font-size: 12px;
+  color: #f5ecd4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tb-roster__card span {
+  font-size: 10px;
+  color: #9a8b72;
+  font-weight: 650;
+}
+
+.tb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 2px;
+}
+.tb-btn-primary {
+  min-height: 48px;
+  font-weight: 900 !important;
+}
+
+/* Legacy class hooks */
+.med-tourney-board {
+  /* if old class still used somewhere */
+}

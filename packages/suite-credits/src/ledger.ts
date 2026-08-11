@@ -26,6 +26,12 @@ export const SUITE_CREDITS_ALIAS_EVENT = 'riddle-suite-credits-changed';
 const SUITE_COOKIE_DOMAIN = '.riddlewallet.com';
 const DEFAULT_MAX_AGE = 30 * 24 * 60 * 60;
 const CREDITS_V2_SCALE_FLAG = 'riddle_credits_denom_v2';
+/**
+ * Browsers cap one cookie near 4096 bytes *including* name/attrs, on the
+ * ENCODED value. Never slice JSON mid-token — that is what broke credits
+ * following from Wallet → Cities / Fighter (garbage cookie → 0 balance).
+ */
+const SUITE_COOKIE_MAX_ENCODED = 3600;
 
 // ─── Shapes ────────────────────────────────────────────────────────────────
 
@@ -115,9 +121,12 @@ function setSuiteCookie(
 ): void {
   if (!isBrowser()) return;
   try {
-    const v = value.length > 3500 ? value.slice(0, 3500) : value;
+    const encoded = encodeURIComponent(value);
+    // Refuse oversized writes rather than truncating JSON (matches suiteCrossStorage).
+    // Clears (maxAgeSec 0) always pass. Callers slim via slimDevPlanJson first.
+    if (maxAgeSec > 0 && encoded.length > SUITE_COOKIE_MAX_ENCODED) return;
     document.cookie =
-      `${name}=${encodeURIComponent(v)}; Path=/; Max-Age=${Math.max(0, maxAgeSec)}; SameSite=Lax` +
+      `${name}=${encoded}; Path=/; Max-Age=${Math.max(0, maxAgeSec)}; SameSite=Lax` +
       secureAttr() +
       cookieDomainAttr();
   } catch {
@@ -190,35 +199,141 @@ function ensureDevPlanCreditsJson(json: string): string {
   }
 }
 
+/**
+ * Compact entitlement for Domain=.riddlewallet.com cookie transport.
+ * Keeps only fields cities/fighter/civ need to show & spend the same pool.
+ */
+function slimDevPlanJson(json: string): string {
+  try {
+    const p = JSON.parse(json) as Record<string, unknown>;
+    if (!p || typeof p !== 'object') return json;
+    const slim: Record<string, unknown> = {
+      plan: typeof p.plan === 'string' && p.plan ? p.plan : 'free',
+      credits: normalizeCredits(p.credits),
+      lastGrantAt: typeof p.lastGrantAt === 'string' ? p.lastGrantAt : null,
+      expiresAt: typeof p.expiresAt === 'string' ? p.expiresAt : null,
+      updatedAt:
+        typeof p.updatedAt === 'string' && p.updatedAt
+          ? p.updatedAt
+          : new Date().toISOString(),
+    };
+    if (typeof p.lastPaymentTx === 'string' && p.lastPaymentTx) {
+      slim.lastPaymentTx = p.lastPaymentTx.slice(0, 128);
+    }
+    return JSON.stringify(slim);
+  } catch {
+    return json;
+  }
+}
+
+type ParsedLedgerSide = {
+  raw: string;
+  credits: number;
+  t: number;
+};
+
+function parseLedgerSide(raw: string | null): ParsedLedgerSide | null {
+  if (!raw) return null;
+  try {
+    const o = JSON.parse(raw) as {
+      updatedAt?: string | number;
+      connectedAt?: number;
+      credits?: unknown;
+      /** Slim suiteCrossStorage / legacy cookie field */
+      c?: unknown;
+      balance?: unknown;
+      /** Unix ms on some slim payloads */
+      t?: unknown;
+    };
+    if (!o || typeof o !== 'object') return null;
+    // Accept credits | c | balance (wallet/dev/slim cookie shapes)
+    const credits = normalizeCredits(
+      o.credits != null ? o.credits : o.c != null ? o.c : o.balance,
+    );
+    let t = 0;
+    if (typeof o.updatedAt === 'number' && Number.isFinite(o.updatedAt)) {
+      t = o.updatedAt > 1e12 ? o.updatedAt : o.updatedAt * 1000;
+    } else if (o.updatedAt != null) {
+      const parsed = Date.parse(String(o.updatedAt));
+      t = Number.isFinite(parsed) ? parsed : 0;
+    }
+    if (!t) {
+      const n = Number(o.connectedAt ?? o.t);
+      if (Number.isFinite(n) && n > 0) t = n > 1e12 ? n : n * 1000;
+    }
+    // Rewrite slim {c,t} into canonical JSON so later merges see `credits`
+    let normalizedRaw = raw;
+    if (
+      (o.credits == null || typeof o.credits !== 'number') &&
+      credits >= 0
+    ) {
+      try {
+        normalizedRaw = JSON.stringify({
+          plan: typeof (o as { plan?: string }).plan === 'string'
+            ? (o as { plan?: string }).plan
+            : 'free',
+          credits,
+          lastGrantAt: null,
+          expiresAt: null,
+          updatedAt: t ? new Date(t).toISOString() : new Date().toISOString(),
+        });
+      } catch {
+        /* keep raw */
+      }
+    }
+    return { raw: normalizedRaw, credits, t };
+  } catch {
+    // Corrupt / truncated cookie — ignore so a good LS or cookie can win
+    return null;
+  }
+}
+
+/**
+ * Merge LS + cookie for the shared credit pool.
+ *
+ * Prefer **newer `updatedAt`** so spends/grants converge across subdomains.
+ * Never prefer "max credits" when both sides are valid — that undid spends
+ * when a stale higher cookie beat a fresher lower LS (or vice versa).
+ *
+ * Corrupt / truncated cookies parse as null (see parseLedgerSide), so they
+ * cannot invent a newer zero and wipe a good ledger.
+ *
+ * Tie-break when timestamps match: keep localStorage (same-origin truth).
+ */
 function suiteStorageGet(lsKey: string, cookieName: string): string | null {
   const local = lsGet(lsKey);
   const cookie = getSuiteCookie(cookieName);
-  if (local && cookie) {
-    try {
-      const a = JSON.parse(local) as { updatedAt?: string; connectedAt?: number };
-      const b = JSON.parse(cookie) as { updatedAt?: string; connectedAt?: number };
-      const ta = Date.parse(String(a.updatedAt || 0)) || Number(a.connectedAt) || 0;
-      const tb = Date.parse(String(b.updatedAt || 0)) || Number(b.connectedAt) || 0;
-      if (tb > ta) {
-        lsSet(lsKey, cookie);
-        return cookie;
-      }
-      if (ta > tb) {
-        setSuiteCookie(cookieName, local);
-        return local;
-      }
-    } catch {
-      /* fall through */
+  const L = parseLedgerSide(local);
+  const C = parseLedgerSide(cookie);
+
+  if (L && C) {
+    let winner: ParsedLedgerSide;
+    if (C.t !== L.t) {
+      winner = C.t > L.t ? C : L;
+    } else if (L.credits !== C.credits) {
+      // Identical clock (or both missing): prefer LS so in-tab spends stick.
+      // If LS is missing a clock but cookie has one, C.t !== L.t already handled.
+      winner = L;
+    } else {
+      winner = L;
     }
-    return local;
+
+    // Always converge both sides onto winner so the next cross-app read is stable.
+    try {
+      if (local !== winner.raw) lsSet(lsKey, winner.raw);
+      setSuiteCookie(cookieName, slimDevPlanJson(winner.raw));
+    } catch {
+      /* soft */
+    }
+    return winner.raw;
   }
-  if (local) {
-    setSuiteCookie(cookieName, local);
-    return local;
+  if (L) {
+    setSuiteCookie(cookieName, slimDevPlanJson(L.raw));
+    return L.raw;
   }
-  if (cookie) {
-    lsSet(lsKey, cookie);
-    return cookie;
+  if (C) {
+    lsSet(lsKey, C.raw);
+    return C.raw;
   }
   return null;
 }
@@ -229,8 +344,10 @@ function suiteStorageSet(
   value: string,
   maxAgeSec = DEFAULT_MAX_AGE
 ): void {
-  lsSet(lsKey, value);
-  setSuiteCookie(cookieName, value, maxAgeSec);
+  const normalized = ensureDevPlanCreditsJson(value);
+  lsSet(lsKey, normalized);
+  // Always write slim shape to cookie so cross-subdomain apps get a valid rdl_dev
+  setSuiteCookie(cookieName, slimDevPlanJson(normalized), maxAgeSec);
 }
 
 function suiteStorageRemove(lsKey: string, cookieName: string): void {
@@ -290,25 +407,39 @@ export function loadDevEntitlement(): DevEntitlement {
   try {
     const raw = readDevPlanJson();
     if (!raw) return freeDevEntitlement();
-    const parsed = JSON.parse(raw) as Partial<DevEntitlement>;
-    if (!parsed?.plan || !(parsed.plan in DEV_PLANS))
-      return freeDevEntitlement();
+    const parsed = JSON.parse(raw) as Partial<DevEntitlement> & {
+      credits?: unknown;
+    };
+    // Never zero credits just because plan is missing/unknown — preserve balance
+    // so Wallet / Cities / Fighter / Civ all share one pool.
+    const plan: DevPlanId =
+      parsed?.plan && parsed.plan in DEV_PLANS
+        ? (parsed.plan as DevPlanId)
+        : 'free';
 
-    let credits = normalizeCredits(parsed.credits);
+    const credits = normalizeCredits(parsed.credits);
 
+    // One-shot migration flag only — do NOT multiply balances (broke cross-app).
     try {
-      if (localStorage.getItem(CREDITS_V2_SCALE_FLAG) !== '1' && credits > 0) {
-        credits = credits * 10;
-        localStorage.setItem(CREDITS_V2_SCALE_FLAG, '1');
-      } else if (localStorage.getItem(CREDITS_V2_SCALE_FLAG) !== '1') {
+      if (localStorage.getItem(CREDITS_V2_SCALE_FLAG) !== '1') {
         localStorage.setItem(CREDITS_V2_SCALE_FLAG, '1');
       }
     } catch {
       /* private mode */
     }
 
+    let updatedAt: string;
+    const rawUpdated = (parsed as { updatedAt?: unknown }).updatedAt;
+    if (typeof rawUpdated === 'string' && rawUpdated) {
+      updatedAt = rawUpdated;
+    } else if (typeof rawUpdated === 'number' && Number.isFinite(rawUpdated)) {
+      updatedAt = new Date(rawUpdated > 1e12 ? rawUpdated : rawUpdated * 1000).toISOString();
+    } else {
+      updatedAt = new Date().toISOString();
+    }
+
     const ent: DevEntitlement = {
-      plan: parsed.plan as DevPlanId,
+      plan,
       credits,
       lastGrantAt:
         typeof parsed.lastGrantAt === 'string' ? parsed.lastGrantAt : null,
@@ -318,20 +449,18 @@ export function loadDevEntitlement(): DevEntitlement {
         typeof parsed.lastPaymentTx === 'string'
           ? parsed.lastPaymentTx
           : undefined,
-      updatedAt:
-        typeof parsed.updatedAt === 'string'
-          ? parsed.updatedAt
-          : new Date().toISOString(),
+      updatedAt,
     };
 
-    if (typeof parsed.credits !== 'number' || parsed.credits !== credits) {
-      try {
-        persistDevPlanJson(JSON.stringify(ent));
-      } catch {
-        /* ignore */
-      }
+    // Persist normalized shape so other apps always get valid plan+credits
+    try {
+      const want = JSON.stringify(ent);
+      if (want !== raw) persistDevPlanJson(want);
+    } catch {
+      /* ignore */
     }
 
+    // Plan expiry drops paid plan → free but KEEPS credit balance
     if (ent.expiresAt && Date.parse(ent.expiresAt) < Date.now()) {
       return { ...ent, plan: 'free', expiresAt: null };
     }
@@ -444,6 +573,128 @@ export function grant(amount: number, reason = 'grant'): DevEntitlement {
   );
 }
 
+/**
+ * Free starter pack for every new user — **1000 credits once**.
+ * Ledger is browser/device shared (rdl_dev), so this is once per browser,
+ * not once per plan purchase. Optional address only tags the grant reason.
+ */
+export const HANDLE_STARTER_CREDITS = 1000;
+/** Alias — preferred name for the free starter grant. */
+export const STARTER_CREDITS = HANDLE_STARTER_CREDITS;
+const STARTER_FLAG_KEY = 'riddle_starter_credits_v1';
+const HANDLE_STARTER_FLAG_PREFIX = 'riddle_handle_starter_v1:';
+
+function readStarterAlreadyClaimed(address?: string | null): boolean {
+  if (!isBrowser()) return false;
+  try {
+    if (localStorage.getItem(STARTER_FLAG_KEY) === '1') return true;
+    const addr = String(address || '')
+      .trim()
+      .toLowerCase();
+    // Legacy per-wallet / browser handle flags (pre-unification)
+    if (localStorage.getItem(HANDLE_STARTER_FLAG_PREFIX + 'browser') === '1') {
+      return true;
+    }
+    if (addr && localStorage.getItem(HANDLE_STARTER_FLAG_PREFIX + addr) === '1') {
+      return true;
+    }
+  } catch {
+    /* soft */
+  }
+  return false;
+}
+
+function markStarterClaimed(address?: string | null): void {
+  if (!isBrowser()) return;
+  try {
+    localStorage.setItem(STARTER_FLAG_KEY, '1');
+    const addr = String(address || '')
+      .trim()
+      .toLowerCase();
+    localStorage.setItem(
+      HANDLE_STARTER_FLAG_PREFIX + (addr || 'browser'),
+      '1'
+    );
+  } catch {
+    /* soft */
+  }
+}
+
+/**
+ * Ensure every browser gets the free **1000-credit starter once**.
+ *
+ * Rules (no infinite free pool):
+ *  - already claimed → never auto-grant again (spent-to-0 stays 0)
+ *  - balance ≥ 1000 → mark claimed, grant 0
+ *  - never claimed → mark claimed first, then grant gap up to 1000
+ *  - opts.force → grant gap regardless of claim flag (admin / tests only)
+ *
+ * Safe on every hydrate / app mount. Recovering wiped ledgers that left the
+ * claim flag set is intentionally NOT done — that path refilled forever after
+ * users spent their starter to zero.
+ */
+export function ensureStarterCredits(
+  address?: string | null,
+  opts?: { force?: boolean; amount?: number }
+): { granted: number; balance: number; alreadyClaimed: boolean } {
+  const amount = Math.max(
+    0,
+    Math.floor(Number(opts?.amount ?? STARTER_CREDITS) || 0)
+  );
+  if (!isBrowser() || amount <= 0) {
+    return { granted: 0, balance: getBalance(), alreadyClaimed: false };
+  }
+
+  const bal = getBalance();
+  const claimed = readStarterAlreadyClaimed(address);
+  const addr = String(address || '')
+    .trim()
+    .toLowerCase();
+  const reasonBase = addr
+    ? `starter:${addr.slice(0, 12)}`
+    : 'starter:free';
+
+  // Already at or above starter floor — seal claim flag
+  if (!opts?.force && bal >= amount) {
+    markStarterClaimed(address);
+    return { granted: 0, balance: bal, alreadyClaimed: claimed };
+  }
+
+  // Claimed and not forced: user already received starter (spent some or all)
+  if (!opts?.force && claimed) {
+    return { granted: 0, balance: bal, alreadyClaimed: true };
+  }
+
+  // First-time (or force): claim flag BEFORE grant to shrink multi-mount races
+  // (React Strict Mode, WalletNav + ClientProviders + bridge all call this).
+  markStarterClaimed(address);
+
+  // Re-read after claim — another mount may have granted already
+  const bal2 = getBalance();
+  const need = Math.max(0, amount - bal2);
+  if (need <= 0) {
+    return { granted: 0, balance: bal2, alreadyClaimed: true };
+  }
+
+  grant(need, opts?.force ? `${reasonBase}:force` : reasonBase);
+  return {
+    granted: need,
+    balance: getBalance(),
+    alreadyClaimed: claimed,
+  };
+}
+
+/**
+ * @deprecated Use `ensureStarterCredits` — same one-time 1000 free starter.
+ * Kept for handle-claim call sites.
+ */
+export function grantHandleStarterCredits(
+  address?: string | null,
+  opts?: { force?: boolean; amount?: number }
+): { granted: number; balance: number; alreadyClaimed: boolean } {
+  return ensureStarterCredits(address, opts);
+}
+
 /** Spend credits; returns false if balance is insufficient. */
 export function spend(amount: number, reason = 'spend'): boolean {
   const cost = Math.max(0, Math.floor(Number(amount) || 0));
@@ -493,12 +744,21 @@ export function setPlan(
 ): DevEntitlement {
   const current = loadDevEntitlement();
   const p = DEV_PLANS[plan] ?? DEV_PLANS.free;
-  const carried = p.rollover ? Math.min(current.credits, p.rolloverCap) : 0;
-  const grant =
+  // Free plan must never wipe the shared credit pool (starter / PAYG / earns).
+  // Paid plans roll over up to rolloverCap; non-rollover paid plans start from 0 + grant.
+  const carried =
+    plan === 'free'
+      ? current.credits
+      : p.rollover
+        ? Math.min(current.credits, p.rolloverCap)
+        : 0;
+  const grantAmt =
     opts?.creditGrant != null && opts.creditGrant >= 0
       ? Math.floor(opts.creditGrant)
-      : p.monthlyCredits;
-  const credits = carried + grant;
+      : plan === 'free'
+        ? 0
+        : p.monthlyCredits;
+  const credits = carried + grantAmt;
   const delta = credits - current.credits;
   const hours =
     opts?.durationHours != null && opts.durationHours > 0
@@ -584,7 +844,19 @@ export function getDevEntitlementServerSnapshot(): DevEntitlement {
   return SERVER_SNAPSHOT;
 }
 
-export function hydrateDevEntitlementFromSuite(): DevEntitlement {
+/**
+ * Re-read ledger from LS/cookie and ensure free starter (1000 cr) once per browser.
+ * Call on app mount / focus. Already-claimed browsers are left unchanged (no refill).
+ */
+export function hydrateDevEntitlementFromSuite(
+  address?: string | null
+): DevEntitlement {
+  snapshotCache = null;
+  try {
+    ensureStarterCredits(address);
+  } catch {
+    /* soft — never block hydrate */
+  }
   snapshotCache = null;
   return getDevEntitlementSnapshot();
 }

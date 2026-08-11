@@ -65,7 +65,10 @@ export function nextStarterSerial(): number {
   }
 }
 
-/** Offline portrait — prefer painted starter body; SVG fallback for rare offline edge cases. */
+/**
+ * Offline portrait plate for Basic Human — painted PNG body (never SVG).
+ * Name kept for import stability; returns raster path only.
+ */
 export function basicHumanSvgDataUri(opts?: {
   serial?: number
   hue?: number
@@ -196,11 +199,12 @@ function metaBase(): string {
     const from =
       env.VITE_META_BASE_URL ||
       env.VITE_WORLD_API ||
-      SUITE.reborn ||
-      'https://reborn.riddlewallet.com'
+      SUITE.civ ||
+      SUITE.world ||
+      'https://civ.riddlewallet.com'
     return String(from).replace(/\/+$/, '')
   } catch {
-    return 'https://reborn.riddlewallet.com'
+    return 'https://civ.riddlewallet.com'
   }
 }
 
@@ -252,14 +256,14 @@ export function createBasicHumanFighter(serial?: number): Fighter {
   const nftId = `starter-human-${s}`
   // Pinata product art is primary — user-facing Basic Human plate
   const pinata = basicHumanImageUrl(s)
-  const svg = basicHumanSvgDataUri({ serial: s, label: `Human #${s}` })
   const traits = starterTraits(s)
   const f = fighterFromNft({
     nftId,
     name: `Basic Human #${s}`,
+    // Genesis product plate only — NEW stays empty until real evolve/remint art
     image: pinata,
     originalImage: pinata,
-    newImage: svg,
+    newImage: undefined,
     issuer: STARTER_HUMAN_SLUG,
     taxon: STARTER_HUMAN_TAXON,
     collection: STARTER_HUMAN_COLLECTION,

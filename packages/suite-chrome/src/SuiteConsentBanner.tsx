@@ -1,15 +1,23 @@
 'use client'
 
 /**
- * Suite consent banner — first-visit dialog + always-available Accept/Reject
- * so users (and inspect exercises) can re-click after a prior decision.
+ * Suite consent banner — first-visit dialog.
  *
- * Exercise FAIL fix (rw-cookie-banner-exercise-fail): never unmount Accept/Reject
- * after the first choice; collapse to a manage strip that stays clickable.
+ * Accept / Reject MUST dismiss the banner completely. Re-open only via
+ * `openSuiteConsentBanner()` (footer “Cookies” / manage preferences).
+ *
+ * Root cause of “Accept does nothing”: after write, a change handler re-read
+ * storage (which could miss Domain-scoped cookies) and reset analyticsOn to
+ * null, which forced the full dialog back open. We now trust the click +
+ * event detail and only re-read for cross-tab storage events.
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent, type PointerEvent } from 'react'
 import { ACCOUNT_URL } from './suite-shell-config'
-import { hasConsentedToAnalytics, readSuiteConsent, writeSuiteConsent } from './consent'
+import {
+  hasConsentedToAnalytics,
+  readSuiteConsent,
+  writeSuiteConsent,
+} from './consent'
 
 export type SuiteConsentBannerProps = {
   className?: string
@@ -20,24 +28,52 @@ export default function SuiteConsentBanner({ className = '' }: SuiteConsentBanne
   const [expanded, setExpanded] = useState(false)
   /** Hydrated so SSR never flashes wrong mode. */
   const [ready, setReady] = useState(false)
+  /** null = undecided; true/false = stored choice */
   const [analyticsOn, setAnalyticsOn] = useState<boolean | null>(null)
 
   useEffect(() => {
-    const sync = () => {
-      const c = readSuiteConsent()
+    const syncFromStorage = () => {
+      // sessionStorage backup if LS/cookie missing this session
+      let c = readSuiteConsent()
+      if (!c) {
+        try {
+          const raw = sessionStorage.getItem('rdl_consent')
+          if (raw) {
+            const p = JSON.parse(raw) as { analytics?: boolean }
+            if (typeof p.analytics === 'boolean') c = { analytics: p.analytics }
+          }
+        } catch {
+          /* soft */
+        }
+      }
       setAnalyticsOn(c === null ? null : c.analytics)
-      // Expand when no decision yet; keep manage strip when decided
+      // Only auto-expand when no decision yet
       if (c === null) setExpanded(true)
+      else setExpanded(false)
     }
-    sync()
+
+    syncFromStorage()
     setReady(true)
 
-    const onChange = () => {
-      const c = readSuiteConsent()
-      setAnalyticsOn(c === null ? null : c.analytics)
-      // After a choice, collapse the large dialog but keep manage strip mounted
-      if (c !== null) setExpanded(false)
+    const onChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { analytics?: boolean }
+        | null
+        | undefined
+      if (detail === null) {
+        setAnalyticsOn(null)
+        setExpanded(true)
+        return
+      }
+      if (detail && typeof detail.analytics === 'boolean') {
+        setAnalyticsOn(detail.analytics)
+        setExpanded(false)
+        return
+      }
+      // Fallback re-read (storage event from other tab)
+      syncFromStorage()
     }
+
     const onOpen = () => setExpanded(true)
 
     window.addEventListener('riddle-consent-changed', onChange)
@@ -50,8 +86,24 @@ export default function SuiteConsentBanner({ className = '' }: SuiteConsentBanne
     }
   }, [])
 
-  // SSR / pre-hydrate: still mount a zero-visibility shell so DOM testids exist
-  // after first paint; full interaction after ready.
+  const accept = useCallback((e?: MouseEvent | PointerEvent) => {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    // Optimistic dismiss — must not wait on storage
+    setAnalyticsOn(true)
+    setExpanded(false)
+    writeSuiteConsent({ analytics: true })
+  }, [])
+
+  const reject = useCallback((e?: MouseEvent | PointerEvent) => {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    setAnalyticsOn(false)
+    setExpanded(false)
+    writeSuiteConsent({ analytics: false })
+  }, [])
+
+  // SSR / pre-hydrate placeholder
   if (!ready) {
     return (
       <div
@@ -65,55 +117,47 @@ export default function SuiteConsentBanner({ className = '' }: SuiteConsentBanne
     )
   }
 
-  const accept = () => {
-    // Optimistic UI so Accept/Reject stay visible & re-clickable immediately
-    setAnalyticsOn(true)
-    writeSuiteConsent({ analytics: true })
-    setExpanded(false)
-  }
-  const reject = () => {
-    setAnalyticsOn(false)
-    writeSuiteConsent({ analytics: false })
-    setExpanded(false)
-  }
-
   const undecided = analyticsOn === null
-  // Always mount Accept/Reject so they remain re-clickable after first decision.
-  // Full dialog when undecided or force-expanded; compact manage strip otherwise.
+  // Full dialog only when undecided or user reopened manage UI
   const showFull = undecided || expanded
+
+  // After a decision and not reopened: unmount banner entirely (Accept “goes”)
+  if (!showFull) {
+    return (
+      <div
+        className={['rw-suite-consent', 'rw-suite-consent--hidden', className]
+          .filter(Boolean)
+          .join(' ')}
+        data-suite-consent="1"
+        data-suite-consent-mode="hidden"
+        data-suite-consent-analytics={analyticsOn ? 'on' : 'off'}
+        hidden
+        aria-hidden="true"
+      />
+    )
+  }
 
   return (
     <div
-      className={[
-        'rw-suite-consent',
-        showFull ? '' : 'rw-suite-consent--manage',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
-      role={showFull ? 'dialog' : 'region'}
+      className={['rw-suite-consent', className].filter(Boolean).join(' ')}
+      role="dialog"
+      aria-modal="false"
       aria-live="polite"
-      aria-label={showFull ? 'Cookie consent' : 'Cookie preferences'}
+      aria-label="Cookie consent"
       data-suite-consent="1"
-      data-suite-consent-mode={showFull ? 'banner' : 'manage'}
+      data-suite-consent-mode="banner"
       data-suite-consent-analytics={
         analyticsOn === null ? 'unset' : analyticsOn ? 'on' : 'off'
       }
     >
       <div className="rw-suite-consent__card">
-        {showFull ? (
-          <p className="rw-suite-consent__text">
-            We use optional analytics cookies to improve the suite. Strictly-necessary storage
-            (session, handle cache) is always used.{' '}
-            <a href={ACCOUNT_URL} target="_blank" rel="noopener noreferrer">
-              Learn more
-            </a>
-          </p>
-        ) : (
-          <p className="rw-suite-consent__text rw-suite-consent__text--compact">
-            Cookies: {analyticsOn ? 'analytics on' : 'analytics off'}. Change anytime.
-          </p>
-        )}
+        <p className="rw-suite-consent__text">
+          We use optional analytics cookies to improve the suite. Strictly-necessary storage
+          (session, handle cache) is always used.{' '}
+          <a href={ACCOUNT_URL} target="_blank" rel="noopener noreferrer">
+            Learn more
+          </a>
+        </p>
         <div className="rw-suite-consent__actions">
           <button
             type="button"
@@ -122,9 +166,9 @@ export default function SuiteConsentBanner({ className = '' }: SuiteConsentBanne
             data-testid="consent-accept"
             data-rdl-consent="accept"
             aria-pressed={analyticsOn === true}
-            aria-label="Accept analytics"
+            aria-label="Accept cookies"
           >
-            Accept analytics
+            Accept cookies
           </button>
           <button
             type="button"
@@ -146,11 +190,16 @@ export default function SuiteConsentBanner({ className = '' }: SuiteConsentBanne
 export function useSuiteConsentBannerVisible(): boolean {
   const [visible, setVisible] = useState(false)
   useEffect(() => {
-    // Banner (or manage strip) is always mounted after hydrate
-    setVisible(true)
-    const onChange = () => setVisible(true)
+    const sync = () => {
+      const c = readSuiteConsent()
+      // Visible only when no decision yet
+      setVisible(c === null)
+    }
+    sync()
+    const onChange = () => sync()
     window.addEventListener('riddle-consent-changed', onChange)
     window.addEventListener('storage', onChange)
+    window.addEventListener('riddle-consent-open', () => setVisible(true))
     return () => {
       window.removeEventListener('riddle-consent-changed', onChange)
       window.removeEventListener('storage', onChange)

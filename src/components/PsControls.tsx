@@ -1,6 +1,6 @@
 /**
- * Fight controls:
- * - Mobile 1P: D-pad LEFT · actions RIGHT (both sides of screen)
+ * Fight controls — iron pads (medieval SF):
+ * - Mobile 1P: D-pad LEFT · actions RIGHT
  * - Local 2P: full pads on each side
  * - Desktop: overlay hidden via CSS; keyboard is primary
  */
@@ -85,7 +85,7 @@ function Face({ onChange }: { onChange: Props['onChange'] }) {
 export function PsControls({ onChange, player = 1, side = 'full' }: Props) {
   if (side === 'left') {
     return (
-      <div className={`ps-pad ps-pad-side-left ps-pad-p${player}`} aria-label="Move pad">
+      <div className={`ps-pad ps-pad-side-left ps-pad-p${player} med-iron-pad`} aria-label="Move pad">
         <Dpad onChange={onChange} />
         <div className="ps-hint">MOVE</div>
       </div>
@@ -93,7 +93,7 @@ export function PsControls({ onChange, player = 1, side = 'full' }: Props) {
   }
   if (side === 'right') {
     return (
-      <div className={`ps-pad ps-pad-side-right ps-pad-p${player}`} aria-label="Action pad">
+      <div className={`ps-pad ps-pad-side-right ps-pad-p${player} med-iron-pad`} aria-label="Action pad">
         <div className="ps-shoulders">
           <button type="button" className="ps-l2" {...bind(onChange, 'special')}>
             L2
@@ -112,7 +112,7 @@ export function PsControls({ onChange, player = 1, side = 'full' }: Props) {
 
   return (
     <div
-      className={`ps-pad ps-pad-p${player}`}
+      className={`ps-pad ps-pad-p${player} med-iron-pad`}
       aria-label={player === 1 ? 'Player 1 controls' : 'Player 2 controls'}
     >
       <div className="ps-shoulders">

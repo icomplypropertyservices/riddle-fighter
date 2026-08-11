@@ -87,19 +87,63 @@ function getCookie(name: string): string | null {
   return null
 }
 
+/**
+ * Browsers cap a single cookie near 4096 bytes *including* name and attributes.
+ * Budget the encoded value against that, leaving room for the attributes.
+ */
+const SUITE_COOKIE_MAX_ENCODED = 3600
+
 function setCookie(name: string, value: string, maxAgeSec: number): void {
   if (!isBrowser()) return
   try {
-    const v = value.length > 3500 ? value.slice(0, 3500) : value
+    const encoded = encodeURIComponent(value)
+    // Never write a value we know the browser will drop, and never write a
+    // truncated one: this cookie carries JSON, so slicing it produced
+    // unparseable garbage that read back as "logged out" on every other app
+    // while the wallet's own localStorage still looked fine. Callers shrink
+    // the payload via fitSuiteSessionToCookie before getting here; if it is
+    // still oversized, leaving the previous good cookie alone beats corrupting
+    // it. (Clearing — maxAgeSec 0 — must always be allowed through.)
+    if (maxAgeSec > 0 && encoded.length > SUITE_COOKIE_MAX_ENCODED) return
     const secure = window.location.protocol === 'https:' ? '; Secure' : ''
     const domain = isSuiteHost() ? '; Domain=.riddlewallet.com' : ''
-    document.cookie = `${name}=${encodeURIComponent(v)}; Path=/; Max-Age=${Math.max(
+    document.cookie = `${name}=${encoded}; Path=/; Max-Age=${Math.max(
       0,
       maxAgeSec,
     )}; SameSite=Lax${secure}${domain}`
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * Serialise a session small enough to survive the cookie, degrading in the
+ * order that costs the least connectivity: extra chain addresses are nice to
+ * have, but `address` + `chain` are what every app needs to consider the user
+ * connected. Always returns valid JSON.
+ */
+export function fitSuiteSessionToCookie(session: SuiteSession): string {
+  const full = JSON.stringify(session)
+  if (encodeURIComponent(full).length <= SUITE_COOKIE_MAX_ENCODED) return full
+
+  // Drop shared accounts one at a time, keeping the active chain's address.
+  const accounts = { ...(session.accounts || {}) }
+  const keys = Object.keys(accounts).filter((k) => accounts[k] !== session.address)
+  while (keys.length) {
+    delete accounts[keys.pop() as string]
+    const candidate = JSON.stringify({ ...session, accounts })
+    if (encodeURIComponent(candidate).length <= SUITE_COOKIE_MAX_ENCODED) return candidate
+  }
+
+  // Last resort — the identity fields only.
+  return JSON.stringify({
+    address: session.address,
+    chain: session.chain,
+    source: session.source,
+    connectedAt: session.connectedAt,
+    expiresAt: session.expiresAt,
+    tier: session.tier,
+  })
 }
 
 function lsGet(key: string): string | null {
@@ -170,13 +214,13 @@ export function readSuiteSession(): SuiteSession | null {
       return cookie
     }
     if (local.connectedAt > cookie.connectedAt) {
-      setCookie(SUITE_SESSION_COOKIE, localRaw!, remainingSeconds(local))
+      setCookie(SUITE_SESSION_COOKIE, fitSuiteSessionToCookie(local), remainingSeconds(local))
     }
     return local
   }
   if (local) {
     // First visit on this subdomain wrote LS only — publish to the suite cookie.
-    setCookie(SUITE_SESSION_COOKIE, localRaw!, remainingSeconds(local))
+    setCookie(SUITE_SESSION_COOKIE, fitSuiteSessionToCookie(local), remainingSeconds(local))
     return local
   }
   if (cookie) {
@@ -258,6 +302,20 @@ export function buildSuiteConnectUrl(opts: {
 }
 
 /**
+ * Node's Buffer, read off globalThis rather than referenced as a bare global.
+ *
+ * This package ships to browser apps (Vite + Next) that do not install
+ * @types/node, where a bare `Buffer` is a hard TS2580 and broke their builds.
+ * Runtime behaviour is identical — same object, just typed locally.
+ */
+type NodeBufferLike = {
+  from(input: string, encoding: string): { toString(encoding: string): string }
+}
+function nodeBuffer(): NodeBufferLike | undefined {
+  return (globalThis as { Buffer?: NodeBufferLike }).Buffer
+}
+
+/**
  * Decode `rw_accounts` — base64url JSON, as written by the wallet's
  * `buildReturnUrlWithSession`. Falls back to plain percent-encoded JSON.
  */
@@ -282,7 +340,7 @@ export function decodeSuiteAccountsParam(
     const json =
       typeof atob !== 'undefined'
         ? decodeURIComponent(escape(atob(b64)))
-        : Buffer.from(b64, 'base64').toString('utf8')
+        : (nodeBuffer()?.from(b64, 'base64').toString('utf8') ?? '')
     return collect(JSON.parse(json))
   } catch {
     try {
@@ -325,9 +383,14 @@ export function acceptSuiteConnectHandoff(app?: string): SuiteSession | null {
     tier: url.searchParams.get('rw_tier') || undefined,
     feeBps: Number(url.searchParams.get('rw_fee_bps')) || undefined,
   }
-  const json = JSON.stringify(session)
-  lsSet(SUITE_SESSION_LS_KEY, json)
-  setCookie(SUITE_SESSION_COOKIE, json, remainingSeconds(session))
+  // localStorage is same-origin and roomy — it keeps the complete session.
+  // The suite cookie is size-capped, so it gets a fitted copy.
+  lsSet(SUITE_SESSION_LS_KEY, JSON.stringify(session))
+  setCookie(
+    SUITE_SESSION_COOKIE,
+    fitSuiteSessionToCookie(session),
+    remainingSeconds(session),
+  )
 
   for (const k of ['rw_address', 'rw_chain', 'rw_source', 'rw_accounts', 'rw_tier', 'rw_fee_bps']) {
     url.searchParams.delete(k)

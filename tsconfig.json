@@ -17,7 +17,12 @@
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": {
+      "@/*": ["src/*"],
+      "@riddle/suite-credits": ["packages/suite-credits/src/index.ts"],
+      "@riddle/suite-chrome": ["packages/suite-chrome/src/index.ts"],
+      "@riddle/suite-game-economy": ["packages/suite-game-economy/src/index.ts"]
+    }
   },
   "include": ["src"]
 }

@@ -1,20 +1,35 @@
 /**
- * Landscape fullscreen for fights — mobile-first.
+ * Fight is ALWAYS fullscreen / immersive for the whole match.
+ * Uses Fullscreen API when allowed + CSS immersive fallback always.
  */
 
 export async function enterFightFullscreen(el?: HTMLElement | null): Promise<boolean> {
   if (typeof document === 'undefined') return false
   const target = el || document.documentElement
+  // Immersive CSS first so layout goes full-viewport even if FS API is blocked
+  document.documentElement.classList.add('fight-immersive')
+  document.body.classList.add('fight-immersive')
+  document.body.dataset.fightActive = '1'
   try {
     const anyEl = target as HTMLElement & {
       webkitRequestFullscreen?: () => Promise<void> | void
       msRequestFullscreen?: () => Promise<void> | void
     }
-    if (target.requestFullscreen) await target.requestFullscreen()
-    else if (anyEl.webkitRequestFullscreen) await anyEl.webkitRequestFullscreen()
-    else if (anyEl.msRequestFullscreen) await anyEl.msRequestFullscreen()
+    if (!isFullscreen()) {
+      if (target.requestFullscreen) await target.requestFullscreen()
+      else if (anyEl.webkitRequestFullscreen) await anyEl.webkitRequestFullscreen()
+      else if (anyEl.msRequestFullscreen) await anyEl.msRequestFullscreen()
+    }
   } catch {
-    /* user gesture / policy */
+    /* user gesture / policy — CSS immersive still active */
+  }
+  // Also try documentElement if shell request failed
+  try {
+    if (!isFullscreen() && document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen()
+    }
+  } catch {
+    /* soft */
   }
   try {
     const so = screen.orientation as ScreenOrientation & {
@@ -24,14 +39,13 @@ export async function enterFightFullscreen(el?: HTMLElement | null): Promise<boo
   } catch {
     /* iOS often blocks */
   }
-  document.documentElement.classList.add('fight-immersive')
-  document.body.classList.add('fight-immersive')
-  return isFullscreen()
+  return isFullscreen() || document.body.classList.contains('fight-immersive')
 }
 
 export async function exitFightFullscreen(): Promise<void> {
   document.documentElement.classList.remove('fight-immersive')
   document.body.classList.remove('fight-immersive')
+  document.body.dataset.fightActive = '0'
   try {
     if (document.fullscreenElement) await document.exitFullscreen()
   } catch {

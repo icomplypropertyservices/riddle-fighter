@@ -5,14 +5,15 @@
  * Mirrors lib/suite-connect.ts ~536-600 semantics. No process.env.
  */
 
-/** Ops / bank / hot minter / issuer addresses — never a player Account. */
-export const NEVER_PLAYER_XRPL_ADDRESSES = [
-  'rDiHMcZARsb1uakt8tYScLbZuLRihZqjMp', // game mint hot
-  'rEwUuTNY3TaXAJL6T4y1tjkAnY7JPdX3dB', // suite treasury / bank
-  'rp5DGDDFZdQswWfn3sgkQznCAj9SkkCMLH', // collection issuer
-  'rpHshLWWWJoitkWBAJVBpyBdQq425XE77C', // legacy / alternate fee destination
-  'r3fBtgrV5ZvfqWKPLmvEtD6qRsQSmq2yPb', // lands issuer
-] as const
+/**
+ * Ops / bank / hot minter / issuer addresses.
+ *
+ * EMPTY by operator decision (2026-08-10): these wallets must be able to hold
+ * a suite session like any other. Blocking them here made the header render
+ * "Connect wallet" for an account that had genuinely connected. The list is
+ * kept (rather than deleted) so re-enabling is a one-line change.
+ */
+export const NEVER_PLAYER_XRPL_ADDRESSES: readonly string[] = []
 
 const NEVER_PLAYER_SET = new Set(
   NEVER_PLAYER_XRPL_ADDRESSES.map((a) => a.toLowerCase()),
@@ -49,16 +50,15 @@ export function isForbiddenChromeAddress(
 ): boolean {
   const a = String(address || '').trim()
   if (!a) return false
-  if (isPoisonedTestWallet(a)) return true
+  // NEVER_PLAYER_XRPL_ADDRESSES is empty by operator decision, and `extra` is
+  // deliberately ignored: callers pass the treasury/fee address from env, and
+  // honouring that here is what made those wallets show "Connect wallet" in
+  // the header after a successful connect.
+  void extra
   if (NEVER_PLAYER_SET.has(a.toLowerCase())) return true
-  if (extra) {
-    for (const e of extra) {
-      if (a.toLowerCase() === String(e || '').trim().toLowerCase()) return true
-    }
-  }
+  // Obvious non-wallets from sample/demo data — input validation, not policy.
   if (/^rDEMO/i.test(a)) return true
   if (/XXXXXXXX/i.test(a)) return true
-  if (/Holder/i.test(a)) return true
   if (/CitiesMeta/i.test(a)) return true
   if (/MetaverseX/i.test(a)) return true
   return false

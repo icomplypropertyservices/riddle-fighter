@@ -27,8 +27,20 @@ function isSecure(): boolean {
 function parseConsent(raw: string | null): SuiteConsent | null {
   if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as Partial<SuiteConsent>
-    if (parsed && typeof parsed.analytics === 'boolean' && parsed.v === 1) {
+    let text = raw
+    // Tolerate accidental double-encoding
+    if (text.includes('%7B') || text.includes('%22')) {
+      try {
+        text = decodeURIComponent(text)
+      } catch {
+        /* keep original */
+      }
+    }
+    const parsed = JSON.parse(text) as Partial<SuiteConsent>
+    if (parsed && typeof parsed.analytics === 'boolean') {
+      // Accept v missing (legacy) as v1
+      const v = parsed.v === 1 || parsed.v == null ? 1 : null
+      if (v !== 1) return null
       return {
         analytics: parsed.analytics,
         ts: Number(parsed.ts) || Date.now(),
@@ -47,7 +59,14 @@ function readCookie(name: string): string | null {
     for (const part of document.cookie.split('; ')) {
       const i = part.indexOf('=')
       if (i < 0) continue
-      if (part.slice(0, i) === name) return decodeURIComponent(part.slice(i + 1))
+      if (part.slice(0, i) === name) {
+        const raw = part.slice(i + 1)
+        try {
+          return decodeURIComponent(raw)
+        } catch {
+          return raw
+        }
+      }
     }
   } catch {
     /* soft */
@@ -55,14 +74,25 @@ function readCookie(name: string): string | null {
   return null
 }
 
-function writeCookie(name: string, value: string, maxAgeSec: number): void {
-  if (typeof document === 'undefined') return
+function writeCookie(name: string, value: string, maxAgeSec: number): boolean {
+  if (typeof document === 'undefined') return false
   try {
     const secure = isSecure() ? '; Secure' : ''
-    const domain = isSuiteHost() ? '; Domain=.riddlewallet.com' : ''
-    document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax${secure}${domain}`
+    // Host-only first (always works on the current origin)
+    document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${Math.max(
+      0,
+      maxAgeSec,
+    )}; SameSite=Lax${secure}`
+    // Suite-wide Domain when on *.riddlewallet.com
+    if (isSuiteHost()) {
+      document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${Math.max(
+        0,
+        maxAgeSec,
+      )}; SameSite=Lax${secure}; Domain=.riddlewallet.com`
+    }
+    return true
   } catch {
-    /* soft */
+    return false
   }
 }
 
@@ -75,24 +105,38 @@ function readLocal(): SuiteConsent | null {
   }
 }
 
-function writeLocal(consent: SuiteConsent): void {
-  if (typeof localStorage === 'undefined') return
+function writeLocal(consent: SuiteConsent): boolean {
+  if (typeof localStorage === 'undefined') return false
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(consent))
+    return true
   } catch {
-    /* soft */
+    return false
   }
 }
 
 export function readSuiteConsent(): { analytics: boolean } | null {
   if (typeof window === 'undefined') return null
-  return parseConsent(readCookie(COOKIE_NAME)) || readLocal()
+  // Prefer LS (never blocked by Domain=.riddlewallet.com quirks), then cookie
+  return readLocal() || parseConsent(readCookie(COOKIE_NAME))
 }
 
-export function writeSuiteConsent({ analytics }: { analytics: boolean }): void {
+/**
+ * Persist consent. Returns true if at least one store accepted the write.
+ * Always dispatches the change event with the in-memory choice so UI dismisses
+ * even when storage is restricted.
+ */
+export function writeSuiteConsent({ analytics }: { analytics: boolean }): boolean {
   const consent: SuiteConsent = { analytics, ts: Date.now(), v: 1 }
-  writeCookie(COOKIE_NAME, JSON.stringify(consent), 365 * 24 * 60 * 60)
-  writeLocal(consent)
+  const raw = JSON.stringify(consent)
+  const lsOk = writeLocal(consent)
+  const cookieOk = writeCookie(COOKIE_NAME, raw, 365 * 24 * 60 * 60)
+  // sessionStorage backup so same-tab reloads still dismiss even if LS/cookie blocked
+  try {
+    sessionStorage.setItem(LS_KEY, raw)
+  } catch {
+    /* soft */
+  }
   if (typeof window !== 'undefined') {
     try {
       window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: consent }))
@@ -100,6 +144,7 @@ export function writeSuiteConsent({ analytics }: { analytics: boolean }): void {
       /* soft */
     }
   }
+  return lsOk || cookieOk
 }
 
 /** Clear stored consent so the banner can be shown again (preference change). */
@@ -107,11 +152,17 @@ export function clearSuiteConsent(): void {
   if (typeof window === 'undefined') return
   try {
     writeCookie(COOKIE_NAME, '', 0)
-    // Also clear suite-domain legacy copy if present
     const secure = isSecure() ? '; Secure' : ''
-    const domain = isSuiteHost() ? '; Domain=.riddlewallet.com' : ''
-    document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax${secure}${domain}`
+    if (isSuiteHost()) {
+      document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax${secure}; Domain=.riddlewallet.com`
+    }
+    document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax${secure}`
     localStorage.removeItem(LS_KEY)
+    try {
+      sessionStorage.removeItem(LS_KEY)
+    } catch {
+      /* soft */
+    }
     window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: null }))
   } catch {
     /* soft */
@@ -145,8 +196,17 @@ export function subscribeConsent(listener: ConsentListener): () => void {
   }
 
   const onCustom = (e: Event) => {
-    const detail = (e as CustomEvent).detail as SuiteConsent | undefined
-    listener(detail || readSuiteConsent())
+    const detail = (e as CustomEvent).detail as SuiteConsent | null | undefined
+    // Prefer event detail so Accept/Reject UI never re-opens from a failed re-read
+    if (detail === null) {
+      listener(null)
+      return
+    }
+    if (detail && typeof detail.analytics === 'boolean') {
+      listener({ analytics: detail.analytics })
+      return
+    }
+    listener(readSuiteConsent())
   }
 
   window.addEventListener('storage', onStorage)

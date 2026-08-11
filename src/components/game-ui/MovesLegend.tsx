@@ -1,5 +1,5 @@
 /**
- * Arcade moves + trait power readout — every trait has a combat function.
+ * Command scroll — motion inputs + trait powers (medieval parchment).
  */
 import type { Fighter } from '../../lib/fighters'
 import { fighterMoves } from '../../lib/fighters'
@@ -25,9 +25,12 @@ export function MovesLegend({ fighter, compact }: Props) {
   const powers = f?.powers ? powerSummary(f.powers, compact ? 6 : 14) : []
 
   return (
-    <section className={`g-panel g-moves${compact ? ' is-compact' : ''}`} aria-label="Moves">
+    <section
+      className={`g-panel g-moves med-moves${compact ? ' is-compact' : ''}`}
+      aria-label="Moves"
+    >
       <div className="g-panel-head">
-        <h2 className="g-panel-title">{f ? `${f.name} kit` : 'Command list'}</h2>
+        <h2 className="g-panel-title">{f ? `${f.name} · arts` : 'Command scroll'}</h2>
         <span className="g-panel-hint">Motion inputs · trait powers</span>
       </div>
       <ul className="g-moves-list">
@@ -46,8 +49,14 @@ export function MovesLegend({ fighter, compact }: Props) {
           <ul className="g-moves-list" data-testid="trait-powers-list">
             {powers.map((line) => (
               <li key={line}>
-                <span className="g-moves-dot" aria-hidden style={{ background: '#a78bfa' }} />
-                <span style={{ fontSize: 12, color: '#c4b5fd' }}>{line}</span>
+                <span
+                  className="g-moves-dot"
+                  aria-hidden
+                  style={{ background: 'var(--med-gold, #c9a227)' }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--med-parchment-deep, #c4a574)' }}>
+                  {line}
+                </span>
               </li>
             ))}
           </ul>
