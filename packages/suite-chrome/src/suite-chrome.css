@@ -16,10 +16,13 @@ body {
 }
 img,
 video,
-canvas,
 svg {
   max-width: 100%;
   height: auto;
+}
+/* Do NOT set canvas { height:auto } — game stages need explicit layout height. */
+canvas {
+  max-width: 100%;
 }
 img[data-suite-cover],
 .suite-img-cover {
