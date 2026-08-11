@@ -182,15 +182,24 @@ function ensureDevPlanCreditsJson(json: string): string {
   try {
     const p = JSON.parse(json) as Record<string, unknown>;
     if (!p || typeof p !== 'object') return json;
-    const n = Number(p.credits);
-    const credits = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+    // Accept credits | c | balance — slim cookies / legacy writers must not
+    // collapse to 0 (that wiped good balances on re-persist / cross-app hydrate).
+    const rawVal =
+      p.credits != null ? p.credits : p.c != null ? p.c : p.balance;
+    const credits = normalizeCredits(rawVal);
     let dirty = false;
     if (typeof p.credits !== 'number' || p.credits !== credits) {
       p.credits = credits;
       dirty = true;
     }
     if (typeof p.updatedAt !== 'string' || !p.updatedAt) {
-      p.updatedAt = new Date().toISOString();
+      // Prefer existing unix clocks so we don't invent a "newer zero" merge winner
+      const t = Number(p.t ?? p.connectedAt);
+      if (Number.isFinite(t) && t > 0) {
+        p.updatedAt = new Date(t > 1e12 ? t : t * 1000).toISOString();
+      } else {
+        p.updatedAt = new Date().toISOString();
+      }
       dirty = true;
     }
     return dirty ? JSON.stringify(p) : json;

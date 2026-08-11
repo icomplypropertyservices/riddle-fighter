@@ -3,7 +3,11 @@
  * Soft-safe when DATABASE_URL missing (in-memory fallback on this instance).
  *
  * GET  /api/fighter?nftId=…
- * POST /api/fighter  { action: 'match' | 'upgrade' | 'sync' | 'schema', … }
+ * POST /api/fighter  { action: 'match' | 'settle' | 'upgrade' | 'sync' | 'schema', … }
+ *
+ * G10 single XP path:
+ *  - action "match" → claim-first XP + W/L (only XP grant path)
+ *  - action "settle" → wager ledger + meta only (never XP / W-L)
  */
 import pg from 'pg'
 
@@ -630,12 +634,19 @@ export default async function handler(req, res) {
         createdAt: new Date().toISOString(),
       }
 
-      // Soft in-memory if no DB
+      // Soft in-memory if no DB (de-dupe by id)
       if (!mem.has('__wagers')) mem.set('__wagers', [])
       const wlist = mem.get('__wagers')
-      wlist.unshift(row)
-      if (wlist.length > 200) wlist.length = 200
+      if (!wlist.some((w) => w && w.id === row.id)) {
+        wlist.unshift(row)
+        if (wlist.length > 200) wlist.length = 200
+      }
 
+      /**
+       * G10: settle is ledger/audit only — never awards XP or bumps W/L.
+       * Meta fields only; full upsertProgress would race with action=match
+       * and could clobber a concurrent XP grant.
+       */
       const out = await withDb(async (client) => {
         if (client) {
           await client.query(
@@ -662,26 +673,60 @@ export default async function handler(req, res) {
               JSON.stringify(row.meta),
             ],
           )
+
+          const cur = await client.query(
+            `SELECT meta_json FROM fighter_nft_progress WHERE nft_id = $1`,
+            [nftId],
+          )
+          const prevMeta =
+            cur.rows[0]?.meta_json && typeof cur.rows[0].meta_json === 'object'
+              ? cur.rows[0].meta_json
+              : {}
+          const metaPatch = {
+            lastPayoutCredits: payout,
+            lastStakeCredits: stake,
+            lastEntryCredits: entry,
+            lastSettleAt: row.createdAt,
+            totalWagerWon:
+              Math.max(0, Number(prevMeta.totalWagerWon) || 0) + (won ? payout : 0),
+            totalWagerStaked:
+              Math.max(0, Number(prevMeta.totalWagerStaked) || 0) + stake + entry,
+          }
+          // meta_json merge only — wins / losses / xp untouched
+          await client.query(
+            `INSERT INTO fighter_nft_progress (nft_id, meta_json, updated_at)
+             VALUES ($1, $2::jsonb, NOW())
+             ON CONFLICT (nft_id) DO UPDATE SET
+               meta_json = COALESCE(fighter_nft_progress.meta_json, '{}'::jsonb) || $2::jsonb,
+               updated_at = NOW()`,
+            [nftId, JSON.stringify(metaPatch)],
+          )
+        } else {
+          // Memory: patch meta in place — never rewrite wins/losses/xp
+          const pMem = mem.get(nftId) || emptyProgress(nftId)
+          pMem.meta = {
+            ...(pMem.meta || {}),
+            lastPayoutCredits: payout,
+            lastStakeCredits: stake,
+            lastEntryCredits: entry,
+            lastSettleAt: row.createdAt,
+            totalWagerWon:
+              Math.max(0, Number((pMem.meta || {}).totalWagerWon) || 0) +
+              (won ? payout : 0),
+            totalWagerStaked:
+              Math.max(0, Number((pMem.meta || {}).totalWagerStaked) || 0) +
+              stake +
+              entry,
+          }
+          mem.set(nftId, pMem)
         }
-        // Also bump progress meta lastPayout
-        let p = await getProgress(client, nftId)
-        p.meta = {
-          ...(p.meta || {}),
-          lastPayoutCredits: payout,
-          lastStakeCredits: stake,
-          lastEntryCredits: entry,
-          lastSettleAt: row.createdAt,
-          totalWagerWon:
-            Math.max(0, Number((p.meta || {}).totalWagerWon) || 0) +
-            (won ? payout : 0),
-          totalWagerStaked:
-            Math.max(0, Number((p.meta || {}).totalWagerStaked) || 0) + stake + entry,
-        }
-        p = await upsertProgress(client, p)
+
+        const p = await getProgress(client, nftId)
         return {
           ok: true,
           database: Boolean(client),
           settle: row,
+          // Progress counters unchanged by settle (XP path = action match only)
           progress: p,
           metadata: buildUpgradeMetadata(p),
         }

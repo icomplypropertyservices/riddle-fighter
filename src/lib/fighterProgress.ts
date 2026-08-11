@@ -304,9 +304,10 @@ export async function recordMatchProgress(opts: {
 }> {
   const id = String(opts.nftId || '').trim()
   const matchId = String(opts.matchId || opts.battleId || '').trim()
+  const xpGain = xpForMatch(opts.won, opts.combo, opts.wagerCredits)
 
-  // G10 local claim — second call with same matchId is a no-op (no XP / W-L bump)
-  if (matchId && !claimMatchXpKey(matchId)) {
+  // G10: local short-circuit — already claimed this match → no XP / W-L bump
+  if (matchId && wasMatchXpClaimed(matchId)) {
     const existing = loadLocalProgress(id)
     return {
       progress: existing,
@@ -317,46 +318,36 @@ export async function recordMatchProgress(opts: {
     }
   }
 
-  const xpGain = xpForMatch(opts.won, opts.combo, opts.wagerCredits)
-  let p = loadLocalProgress(id)
-  p = {
-    ...p,
-    ownerAddress: opts.ownerAddress || p.ownerAddress,
-    name: opts.name || p.name,
-    image: opts.image || p.image,
-    collection: opts.collection || p.collection,
-    traits: mergeTraits(p.traits, opts.traits),
-    wins: p.wins + (opts.won ? 1 : 0),
-    losses: p.losses + (opts.won ? 0 : 1),
-    xp: p.xp + xpGain,
+  const localBase = loadLocalProgress(id)
+  const payloadBase = {
+    action: 'match' as const,
+    nftId: id,
+    ownerAddress: opts.ownerAddress || localBase.ownerAddress,
+    name: opts.name || localBase.name,
+    image: opts.image || localBase.image,
+    collection: opts.collection || localBase.collection,
+    traits: mergeTraits(localBase.traits, opts.traits),
+    won: opts.won,
+    opponent: opts.opponent,
+    mode: opts.mode || 'cpu',
+    combo: opts.combo || 0,
+    wagerCredits: opts.wagerCredits || 0,
+    // Prefer stable match log PK (API claim-first ON CONFLICT)
+    matchId: matchId || undefined,
+    battleId: opts.battleId || matchId || undefined,
+    entryCredits: opts.entryCredits || 0,
+    payoutCredits: opts.payoutCredits || 0,
+    opponentNftId: opts.opponentNftId || null,
   }
-  p.level = levelFromXp(p.xp)
-  writeLocal(p)
 
+  // G10 server-first: claim on /api/fighter (Neon insert-first / memory Set).
+  // Avoid awarding local XP before the API responds — prevents inflated local
+  // totals when the server already settled (replay / multi-tab / multi-device).
   try {
     const res = await fetch(`${apiBase()}/api/fighter`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'match',
-        nftId: id,
-        ownerAddress: p.ownerAddress,
-        name: p.name,
-        image: p.image,
-        collection: p.collection,
-        traits: p.traits,
-        won: opts.won,
-        opponent: opts.opponent,
-        mode: opts.mode || 'cpu',
-        combo: opts.combo || 0,
-        wagerCredits: opts.wagerCredits || 0,
-        // Prefer stable match log PK (API claim-first ON CONFLICT)
-        matchId: matchId || undefined,
-        battleId: opts.battleId || matchId || undefined,
-        entryCredits: opts.entryCredits || 0,
-        payoutCredits: opts.payoutCredits || 0,
-        opponentNftId: opts.opponentNftId || null,
-      }),
+      body: JSON.stringify(payloadBase),
     })
     if (res.ok) {
       const data = (await res.json()) as {
@@ -368,10 +359,10 @@ export async function recordMatchProgress(opts: {
         matchId?: string
       }
       if (data.progress) {
-        // Server may return alreadySettled with prior progress (no extra XP).
+        // Seal local claim key after authoritative server response
+        if (matchId) claimMatchXpKey(matchId)
         if (data.alreadySettled) {
           const local = loadLocalProgress(id)
-          // Prefer server progress when it reports alreadySettled (authoritative prior settle).
           writeLocal({
             ...data.progress,
             traits: mergeTraits(local.traits, data.progress.traits),
@@ -395,8 +386,34 @@ export async function recordMatchProgress(opts: {
       }
     }
   } catch {
-    /* soft — local still updated */
+    /* soft — fall through to offline local award */
   }
+
+  // Offline / soft fail: claim locally then award at most once
+  if (matchId && !claimMatchXpKey(matchId)) {
+    const existing = loadLocalProgress(id)
+    return {
+      progress: existing,
+      xpGained: 0,
+      alreadySettled: true,
+      matchId,
+      metadata: buildLocalMetadata(existing),
+    }
+  }
+
+  let p: FighterProgress = {
+    ...localBase,
+    ownerAddress: opts.ownerAddress || localBase.ownerAddress,
+    name: opts.name || localBase.name,
+    image: opts.image || localBase.image,
+    collection: opts.collection || localBase.collection,
+    traits: mergeTraits(localBase.traits, opts.traits),
+    wins: localBase.wins + (opts.won ? 1 : 0),
+    losses: localBase.losses + (opts.won ? 0 : 1),
+    xp: localBase.xp + xpGain,
+  }
+  p.level = levelFromXp(p.xp)
+  writeLocal(p)
 
   return {
     progress: p,

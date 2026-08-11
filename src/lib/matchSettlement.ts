@@ -287,33 +287,9 @@ export function settleMatch(input: SettleMatchInput): SettleMatchResult {
       note: comboFlavor(maxCombo) || undefined,
     })
 
-    // Ledger / DB / civ — no XP here (G10 single path → recordMatchProgress below)
-    void logWagerSettlement({
-      id: `ws_${matchId}`,
-      won,
-      nftId: nftKey,
-      nftName: selected.name,
-      ownerAddress: walletAddr || undefined,
-      opponent: opponentName,
-      opponentNftId: opponent?.nftId || opponent?.id,
-      mode: mode === 'tournament' ? 'tournament' : scoreMode,
-      stakeCredits: wagerStake,
-      entryCredits: entryStake,
-      potCredits: (quote?.pot || 0) + (lock && mode !== 'tournament' ? lock.pot : 0),
-      platformCut: quote?.platformCut || 0,
-      payoutCredits: won ? payout : 0,
-      battleId: lock?.battleId,
-      kind:
-        mode === 'tournament'
-          ? 'tournament'
-          : wagerStake > 0 && entryStake > 0
-            ? 'mixed'
-            : wagerStake > 0
-              ? 'wager'
-              : 'entry',
-    })
-
     // ── 5) XP / W-L / traits — ONLY here (G10 single path)
+    // Sole call site for recordMatchProgress from settlement.
+    // wagerLedger / logWagerSettlement must never call it (double XP).
     progress = recordMatchProgress({
       nftId: nftKey,
       ownerAddress: walletAddr || undefined,
@@ -376,6 +352,32 @@ export function settleMatch(input: SettleMatchInput): SettleMatchResult {
         } satisfies ProgressUiUpdate
       })
       .catch(() => null)
+
+    // Ledger / DB / civ AFTER XP claim starts — no XP/W-L (action: settle only)
+    void logWagerSettlement({
+      id: `ws_${matchId}`,
+      won,
+      nftId: nftKey,
+      nftName: selected.name,
+      ownerAddress: walletAddr || undefined,
+      opponent: opponentName,
+      opponentNftId: opponent?.nftId || opponent?.id,
+      mode: mode === 'tournament' ? 'tournament' : scoreMode,
+      stakeCredits: wagerStake,
+      entryCredits: entryStake,
+      potCredits: (quote?.pot || 0) + (lock && mode !== 'tournament' ? lock.pot : 0),
+      platformCut: quote?.platformCut || 0,
+      payoutCredits: won ? payout : 0,
+      battleId: lock?.battleId,
+      kind:
+        mode === 'tournament'
+          ? 'tournament'
+          : wagerStake > 0 && entryStake > 0
+            ? 'mixed'
+            : wagerStake > 0
+              ? 'wager'
+              : 'entry',
+    })
   }
 
   // ── 6) Fun meta + scorebook + result copy

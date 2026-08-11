@@ -4,8 +4,10 @@
  *  2) Fighter /api/fighter settle action (Neon when DATABASE_URL set)
  *  3) Civilisation arena (local + /api/arena when available)
  *
- * XP / W-L / NFT card toast live ONLY in settleMatch (matchSettlement.ts)
- * called from finishMatch. Do not call recordMatchProgress here (double XP).
+ * G10 single XP path:
+ *  - XP / W-L / NFT card toast live ONLY in settleMatch → recordMatchProgress
+ *  - This module must NEVER import or call recordMatchProgress (double XP)
+ *  - API action is always "settle" (ledger/meta only), never "match"
  */
 
 import { WAGER_FEE_BPS } from '@riddle/suite-game-economy'
@@ -128,7 +130,7 @@ export async function logWagerSettlement(opts: {
   }
   saveLocal([log, ...prev])
 
-  // 2) Fighter DB API
+  // 2) Fighter DB API — action "settle" only (no XP; never "match")
   try {
     await fetch('/api/fighter', {
       method: 'POST',
@@ -159,8 +161,7 @@ export async function logWagerSettlement(opts: {
     /* soft */
   }
 
-  // 3) Civilisation arena — append settled fighter wager for public board
-  // (match XP / progress is settleMatch → recordMatchProgress only — single path)
+  // 3) Civilisation arena — public board only (no fighter XP / W-L)
   void logToCivilisationArena(log)
 
   return { ok: true, log }

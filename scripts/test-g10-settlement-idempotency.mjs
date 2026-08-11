@@ -338,6 +338,70 @@ await checkAsync('battleId alone is enough for claim key', async () => {
   assert.equal(b.progress.losses, 1)
 })
 
+await checkAsync('triple replay same matchId never double-awards XP or W-L', async () => {
+  const nftId = 'nft_idem_triple'
+  const matchId = 'battle_g10_triple'
+  const base = {
+    action: 'match',
+    nftId,
+    matchId,
+    battleId: matchId,
+    won: true,
+    combo: 2,
+    wagerCredits: 0,
+    mode: 'cpu',
+  }
+  const a = await postMatch(base)
+  const b = await postMatch(base)
+  const c = await postMatch({ ...base, won: false, combo: 99 })
+  assert.equal(a.alreadySettled, false)
+  assert.ok(a.xpGained > 0)
+  assert.equal(b.alreadySettled, true)
+  assert.equal(b.xpGained, 0)
+  assert.equal(c.alreadySettled, true)
+  assert.equal(c.xpGained, 0)
+  assert.equal(c.progress.xp, a.progress.xp)
+  assert.equal(c.progress.wins, 1)
+  assert.equal(c.progress.losses, 0)
+})
+
+await checkAsync('rapid sequential posts: only first claim awards', async () => {
+  const nftId = 'nft_idem_rapid'
+  const matchId = 'battle_g10_rapid'
+  const body = { action: 'match', nftId, matchId, won: true }
+  // Sequential await (Node single-thread mirrors serverless multi-invoke)
+  const results = []
+  for (let i = 0; i < 5; i++) results.push(await postMatch(body))
+  const awarded = results.filter((r) => !r.alreadySettled)
+  const blocked = results.filter((r) => r.alreadySettled)
+  assert.equal(awarded.length, 1)
+  assert.equal(blocked.length, 4)
+  assert.equal(results[4].progress.xp, awarded[0].xpGained)
+  assert.equal(results[4].progress.wins, 1)
+})
+
+await checkAsync('matchId preferred: battleId collision does not double when matchId set', async () => {
+  const nftId = 'nft_idem_pref'
+  const a = await postMatch({
+    action: 'match',
+    nftId,
+    matchId: 'm_stable_1',
+    battleId: 'b_other',
+    won: true,
+  })
+  const b = await postMatch({
+    action: 'match',
+    nftId,
+    matchId: 'm_stable_1',
+    battleId: 'b_other_changed',
+    won: false,
+  })
+  assert.equal(a.xpGained, 50)
+  assert.equal(b.alreadySettled, true)
+  assert.equal(b.xpGained, 0)
+  assert.equal(b.progress.xp, 50)
+})
+
 if (failed) {
   console.error(`\n${failed} test(s) failed`)
   process.exit(1)
