@@ -180,7 +180,7 @@ export function TourneyBoard({
                       </div>
                       <SeatChip
                         label={a?.label || 'TBD'}
-                        image={a?.image || a?.fighter.image}
+                        image={a?.image || a?.fighter?.image}
                         civTag={a?.civTag}
                         eliminated={a?.eliminated}
                         winner={m.winnerId === a?.id}
@@ -189,7 +189,7 @@ export function TourneyBoard({
                       <div className="tb-match__vs">VS</div>
                       <SeatChip
                         label={b?.label || 'TBD'}
-                        image={b?.image || b?.fighter.image}
+                        image={b?.image || b?.fighter?.image}
                         civTag={b?.civTag}
                         eliminated={b?.eliminated}
                         winner={m.winnerId === b?.id}

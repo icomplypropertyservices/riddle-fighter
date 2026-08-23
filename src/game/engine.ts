@@ -1237,11 +1237,26 @@ function edgesFrom(cur: InputState, prev: InputState): EdgeFlags {
 }
 
 function makeState(f: Fighter, x: number, facing: 1 | -1): FighterState {
+  // Missing NFT / incomplete roster row still has to enter the ring.
+  const base: Fighter = f || {
+    id: 'missing',
+    name: 'Unknown',
+    color: '#334155',
+    color2: '#1e293b',
+    stats: { hp: 100, atk: 12, def: 8, speed: 10, special: 18 },
+    specialName: 'Strike',
+    wins: 0,
+    losses: 0,
+    source: 'nft',
+  }
+  if (!base.stats) {
+    base.stats = { hp: 100, atk: 12, def: 8, speed: 10, special: 18 }
+  }
   // ensure moveset + trait powers attached for combat
-  let fighter = f.moveset ? f : { ...f, moveset: fighterMoves(f) }
+  let fighter = base.moveset ? base : { ...base, moveset: fighterMoves(base) }
   fighter = withCombatPowers(fighter)
   const powers = powersReady(fighter)
-  const maxHp = Math.max(80, Math.round(fighter.stats.hp * HP_SCALE))
+  const maxHp = Math.max(80, Math.round((fighter.stats?.hp || 100) * HP_SCALE))
   return {
     fighter,
     x,

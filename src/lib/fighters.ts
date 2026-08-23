@@ -383,6 +383,16 @@ export function getFighter(_id: string): Fighter | null {
  * Never injects hardcoded demo roster into the player picker.
  * Stats scaled by difficulty (easy = weaker rival).
  */
+function statsOrDefault(s?: FighterStats | null): FighterStats {
+  return {
+    hp: Math.max(60, Number(s?.hp) || 100),
+    atk: Math.max(6, Number(s?.atk) || 12),
+    def: Math.max(4, Number(s?.def) || 8),
+    speed: Math.max(5, Number(s?.speed) || 10),
+    special: Math.max(10, Number(s?.special) || 18),
+  }
+}
+
 export function cpuFromOwned(
   owned: Fighter,
   difficulty: 'easy' | 'medium' | 'hard' | 'expert' = 'easy',
@@ -398,11 +408,13 @@ export function cpuFromOwned(
           : 1.25
   const hpMult =
     difficulty === 'easy' ? 0.75 : difficulty === 'medium' ? 0.95 : difficulty === 'hard' ? 1.1 : 1.25
-  const s = owned.stats
+  const s = statsOrDefault(owned?.stats)
+  const id = owned?.nftId || owned?.id || 'nft'
+  const name = owned?.name || 'NFT'
   return {
     ...owned,
-    id: `cpu-${owned.nftId || owned.id}-${Date.now().toString(36)}`,
-    name: `${label} · ${owned.name}`,
+    id: `cpu-${id}-${Date.now().toString(36)}`,
+    name: `${label} · ${name}`,
     source: 'nft',
     wins: 0,
     losses: 0,
@@ -415,10 +427,10 @@ export function cpuFromOwned(
     },
     // Keep real NFT art so fight uses their assets, not fake demos
     // Preserve OLD (genesis) vs NEW (evolved) — do not collapse slots
-    image: owned.image || owned.newImage || owned.originalImage,
-    originalImage: owned.originalImage || owned.image,
+    image: owned?.image || owned?.newImage || owned?.originalImage,
+    originalImage: owned?.originalImage || owned?.image,
     newImage:
-      owned.newImage &&
+      owned?.newImage &&
       owned.newImage !== (owned.originalImage || owned.image)
         ? owned.newImage
         : undefined,
