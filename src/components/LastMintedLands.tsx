@@ -18,10 +18,12 @@ export type LastMintedLand = {
 
 const API =
   (typeof import.meta !== 'undefined' &&
+    (import.meta as { env?: Record<string, string> }).env?.VITE_CITY_API) ||
+  (typeof import.meta !== 'undefined' &&
     (import.meta as { env?: Record<string, string> }).env?.VITE_WORLD_API) ||
   (typeof import.meta !== 'undefined' &&
     (import.meta as { env?: Record<string, string> }).env?.VITE_API_BASE) ||
-  'https://civ.riddlewallet.com'
+  'https://city.riddlewallet.com'
 
 function pad(n: number) {
   return String(Math.max(1, Math.min(1000, n))).padStart(4, '0')
