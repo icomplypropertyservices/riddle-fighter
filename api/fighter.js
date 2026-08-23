@@ -211,13 +211,25 @@ function rowToProgress(row) {
     traits: Array.isArray(row.traits_json)
       ? row.traits_json
       : typeof row.traits_json === 'string'
-        ? JSON.parse(row.traits_json || '[]')
+        ? (() => {
+            try {
+              return JSON.parse(row.traits_json || '[]')
+            } catch {
+              return []
+            }
+          })()
         : row.traits_json || [],
     meta:
       row.meta_json && typeof row.meta_json === 'object'
         ? row.meta_json
         : typeof row.meta_json === 'string'
-          ? JSON.parse(row.meta_json || '{}')
+          ? (() => {
+              try {
+                return JSON.parse(row.meta_json || '{}')
+              } catch {
+                return {}
+              }
+            })()
           : {},
     upgradeLevel: Math.max(0, Number(row.upgrade_level) || 0),
     updatedAt: row.updated_at
