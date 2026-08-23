@@ -17,7 +17,25 @@ function cors(res) {
 }
 
 function readBody(req) {
-  if (req.body && typeof req.body === 'object') return req.body
+  const b = req.body
+  if (b == null || b === '') return {}
+  if (typeof b === 'string') {
+    try {
+      const parsed = JSON.parse(b)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    } catch {
+      return {}
+    }
+  }
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(b)) {
+    try {
+      const parsed = JSON.parse(b.toString('utf8') || '{}')
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    } catch {
+      return {}
+    }
+  }
+  if (typeof b === 'object' && !Array.isArray(b)) return b
   return {}
 }
 
