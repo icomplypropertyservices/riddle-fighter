@@ -522,7 +522,12 @@ async function fetchJson(url: string): Promise<unknown | null> {
   try {
     const res = await fetch(url, { credentials: 'omit' })
     if (!res.ok) return null
-    return await res.json()
+    const ct = res.headers.get('content-type') || ''
+    if (ct.includes('html')) return null
+    const text = await res.text()
+    const trimmed = text.trim()
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null
+    return JSON.parse(trimmed)
   } catch {
     return null
   }

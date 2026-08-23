@@ -53,7 +53,10 @@ export function LastMintedLands() {
     try {
       const r = await fetch(`${API}/api/lands/last-minted?limit=16`)
       if (!r.ok) return
-      const j = (await r.json()) as { lands?: LastMintedLand[] }
+      const ct = r.headers.get('content-type') || ''
+      if (ct.includes('html')) return
+      const text = await r.text()
+      const j = (text ? JSON.parse(text) : {}) as { lands?: LastMintedLand[] }
       setLands(Array.isArray(j.lands) ? j.lands : [])
     } catch {
       /* soft */
@@ -69,7 +72,14 @@ export function LastMintedLands() {
     setMsg('Scanning…')
     try {
       const r = await fetch(`${API}/api/lands/sync-issuer`, { method: 'POST' })
-      const j = (await r.json()) as { ok?: boolean; linked?: number; error?: string }
+      const text = await r.text()
+      let j: { ok?: boolean; linked?: number; error?: string } = {}
+      try {
+        j = text ? (JSON.parse(text) as typeof j) : {}
+      } catch {
+        setMsg('Scan failed')
+        return
+      }
       setMsg(j.ok ? `Owners updated · ${j.linked ?? 0}` : j.error || 'Scan failed')
       await refresh()
     } catch (e) {

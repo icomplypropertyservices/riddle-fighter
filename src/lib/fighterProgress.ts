@@ -205,10 +205,18 @@ export async function fetchProgress(
       { credentials: 'omit' },
     )
     if (!res.ok) return { progress: local }
-    const data = (await res.json()) as {
+    const ct = res.headers.get('content-type') || ''
+    if (ct.includes('html')) return { progress: local }
+    const text = await res.text()
+    let data: {
       ok?: boolean
       progress?: FighterProgress
       metadata?: FighterMetadataJson
+    }
+    try {
+      data = (text ? JSON.parse(text) : {}) as typeof data
+    } catch {
+      return { progress: local }
     }
     if (!data?.ok || !data.progress) return { progress: local }
     // Prefer higher XP / more fights between local and server

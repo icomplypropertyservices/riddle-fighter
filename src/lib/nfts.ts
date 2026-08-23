@@ -563,6 +563,8 @@ export async function fetchOwnedNfts(
       { mode: 'cors', credentials: 'omit' },
     )
     if (res.ok) {
+      const ct = res.headers.get('content-type') || ''
+      if (ct.includes('html')) throw new Error('wallet nft html')
       const data = (await res.json()) as { nfts?: unknown[] }
       if (Array.isArray(data.nfts)) {
         for (const raw of data.nfts) {
@@ -607,8 +609,15 @@ async function enrichNft(n: RawNft): Promise<Fighter> {
         const res = await fetch(metaUrl, { signal: ctrl?.signal, mode: 'cors' })
         if (res.ok) {
           const ct = res.headers.get('content-type') || ''
-          if (ct.includes('json') || ct.includes('text')) {
-            meta = (await res.json()) as Record<string, unknown>
+          // text/html matches includes('text') and JSON.parse then throws.
+          if (ct.includes('html')) {
+            /* gateway 404 page */
+          } else if (ct.includes('json') || ct.includes('text/plain') || !ct) {
+            const text = await res.text()
+            const trimmed = text.trim()
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+              meta = JSON.parse(trimmed) as Record<string, unknown>
+            }
           }
         }
       } finally {

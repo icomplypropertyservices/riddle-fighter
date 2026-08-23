@@ -227,12 +227,18 @@ async function logToCivilisationArena(log: WagerSettleLog): Promise<void> {
     let tournaments: unknown[] = []
     let wagers: unknown[] = []
     if (getRes.ok) {
-      const data = (await getRes.json()) as {
-        tournaments?: unknown[]
-        wagers?: unknown[]
+      const ct = getRes.headers.get('content-type') || ''
+      if (!ct.includes('html')) {
+        const text = await getRes.text()
+        let data: { tournaments?: unknown[]; wagers?: unknown[] } = {}
+        try {
+          data = text ? (JSON.parse(text) as typeof data) : {}
+        } catch {
+          data = {}
+        }
+        tournaments = Array.isArray(data.tournaments) ? data.tournaments : []
+        wagers = Array.isArray(data.wagers) ? data.wagers : []
       }
-      tournaments = Array.isArray(data.tournaments) ? data.tournaments : []
-      wagers = Array.isArray(data.wagers) ? data.wagers : []
     }
     const merged = [
       settledWager,
