@@ -45,10 +45,21 @@ export const ACCOUNT_URL = "https://account.riddlewallet.com"
  * is deliberately NOT ACCOUNT_URL — sending a credits chip to a privacy page
  * would be wrong even though both are live.
  *
- * `/subscriptions` is a rewrite to the wallet SPA (see the wallet's
- * vercel.json), so it resolves for deep links and in-app navigation alike.
+ * Canonical deep-link: `wallet.riddlewallet.com/?tab=credits` (+ optional `&from=`).
+ * `/subscriptions` only rewrites to wallet `/` and never opens the credits tab.
  */
-export const CREDITS_URL = `${SUITE_SHELL_URLS.wallet}/subscriptions`
+export const CREDITS_URL = `${SUITE_SHELL_URLS.wallet}/?tab=credits`
+
+/**
+ * Build wallet credits top-up URL with optional `from` app tag.
+ * Pattern: `?tab=credits&from={app}` for cities | fighter | world | cafe | …
+ */
+export function suiteCreditsTopUpHref(from?: string | null): string {
+  const src = String(from || '').trim()
+  if (!src || src === 'wallet' || src === 'hub') return CREDITS_URL
+  const tag = src === 'world' ? 'civ' : src === 'cities' ? 'cities' : src
+  return `${CREDITS_URL}&from=${encodeURIComponent(tag)}`
+}
 
 export type SuiteShellAppId = keyof typeof SUITE_SHELL_URLS
 

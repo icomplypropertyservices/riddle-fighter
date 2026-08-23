@@ -9,6 +9,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CREDITS_URL,
+  suiteCreditsTopUpHref,
   APP_LABELS,
   SUITE_CHROME_VERSION,
   SUITE_MORE_LABEL,
@@ -120,10 +121,11 @@ const TIER_DOT: Record<string, string> = {
 }
 
 /** Always-visible suite credits chip — every header, including 0 cr. */
-function SuiteCreditsChip() {
+function SuiteCreditsChip({ fromApp }: { fromApp?: SuiteShellAppId }) {
   const { balance, loading } = useSuiteCredits()
   const { tier } = useSuiteTier()
   const dot = TIER_DOT[tier] || TIER_DOT.free
+  const href = suiteCreditsTopUpHref(fromApp) || CREDITS_URL
 
   const crLabel = useMemo(() => {
     if (loading) return '… cr'
@@ -132,7 +134,7 @@ function SuiteCreditsChip() {
 
   return (
     <a
-      href={CREDITS_URL}
+      href={href}
       className="rw-suite-header__credits"
       title="Suite credits · 100 cr = $1 · top up in Wallet"
       aria-label={`Suite credits ${crLabel}, ${tier} tier`}
@@ -243,7 +245,7 @@ export function UnifiedSuiteHeader({
 
         {showCredits || showAccount || rightSlot ? (
           <div className="rw-suite-header__right">
-            {showCredits ? <SuiteCreditsChip /> : null}
+            {showCredits ? <SuiteCreditsChip fromApp={current} /> : null}
             {/* Apps that pass their own control (the wallet) win; everyone
                 else gets the shared one, so the wallet is reachable from
                 every page of the suite. */}
