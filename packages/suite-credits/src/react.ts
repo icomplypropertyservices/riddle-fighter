@@ -20,7 +20,6 @@ import {
   getDevEntitlementSnapshot,
   getDevEntitlementServerSnapshot,
   hydrateDevEntitlementFromSuite,
-  ensureStarterCredits,
   type DevEntitlement,
 } from './ledger.js';
 import {
@@ -63,16 +62,6 @@ export function useSuiteCredits(opts?: {
     getDevEntitlementSnapshot,
     getDevEntitlementServerSnapshot
   );
-
-  // One-time free starter (1000 cr) once per browser — no refill after spend
-  useEffect(() => {
-    if (!isClient) return;
-    try {
-      ensureStarterCredits(address);
-    } catch {
-      /* soft */
-    }
-  }, [isClient, address]);
 
   const refresh = useCallback(() => {
     hydrateDevEntitlementFromSuite(address);

@@ -854,18 +854,12 @@ export function getDevEntitlementServerSnapshot(): DevEntitlement {
 }
 
 /**
- * Re-read ledger from LS/cookie and ensure free starter (1000 cr) once per browser.
- * Call on app mount / focus. Already-claimed browsers are left unchanged (no refill).
+ * Re-read ledger from LS/cookie. Does not grant a starter seed.
  */
 export function hydrateDevEntitlementFromSuite(
   address?: string | null
 ): DevEntitlement {
-  snapshotCache = null;
-  try {
-    ensureStarterCredits(address);
-  } catch {
-    /* soft — never block hydrate */
-  }
+  void address;
   snapshotCache = null;
   return getDevEntitlementSnapshot();
 }

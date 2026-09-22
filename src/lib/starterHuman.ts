@@ -208,27 +208,14 @@ function metaBase(): string {
   }
 }
 
-/** Soft seed World meta host (best-effort; claim works offline). */
-function softSeedMeta(serial: number, name: string, image: string, traits: Array<{ trait_type: string; value: string | number }>): void {
-  const base = metaBase()
-  const body = JSON.stringify({
-    serial,
-    name,
-    originalImageUrl: image,
-    traits,
-    mintIntent: true,
-    battleFigure: true,
-    fighter: true,
-    freeClaim: true,
-    reason: 'fighter-free-mint',
-  })
-  void fetch(`${base}/api/mint/starter-human/seed`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body,
-  }).catch(() => {
-    /* soft offline */
-  })
+/** Meta seed is disabled — fighter does not POST starter-human seeds. */
+function softSeedMeta(
+  _serial: number,
+  _name: string,
+  _image: string,
+  _traits: Array<{ trait_type: string; value: string | number }>,
+): void {
+  /* no seed */
 }
 
 /**

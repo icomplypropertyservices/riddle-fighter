@@ -612,11 +612,6 @@ export function drawFighterArticulated(
     if (usePainted && bodyImg) {
       ctx.scale(1, -0.32)
       drawPaintedBody(ctx, bodyImg, pose, look, f, null)
-    } else {
-      ctx.scale(f * pose.scaleX * look.height * 0.92, -pose.scaleY * look.height * 0.35)
-      ctx.filter = 'blur(0.5px)'
-      drawBody(ctx, pose, look, color, color2, null)
-      ctx.filter = 'none'
     }
     ctx.restore()
   }
@@ -649,9 +644,6 @@ export function drawFighterArticulated(
       ctx.translate(p.x - f * i * 16, p.y + pose.rootY)
       if (usePainted && bodyImg) {
         drawPaintedBody(ctx, bodyImg, pose, look, f, null)
-      } else {
-        ctx.scale(f * pose.scaleX * look.height, pose.scaleY * look.height)
-        drawBody(ctx, pose, look, color, color2, null)
       }
       ctx.restore()
     }
@@ -686,25 +678,6 @@ export function drawFighterArticulated(
     if (p.dead) ctx.rotate(f * 0.35)
     drawPaintedBody(ctx, bodyImg, pose, look, f, sprite)
     ctx.restore()
-  } else {
-    // Only while the real sheet is still loading
-    ctx.scale(f * pose.scaleX * look.height, pose.scaleY * look.height)
-    if (dir.clipId === 'walk') {
-      ctx.translate(0, Math.sin(frame * 0.65) * 2.4)
-    } else if (dir.clipId === 'idle') {
-      ctx.translate(0, Math.sin(frame / 12) * 1.3)
-    }
-    if (p.dead) {
-      ctx.rotate(0.22)
-      ctx.translate(0, 18)
-    }
-    ctx.save()
-    ctx.globalAlpha = 0.32
-    ctx.shadowColor = look.outline || '#000'
-    ctx.shadowBlur = 12
-    drawBody(ctx, pose, look, shade(color, -60), shade(color2, -50), null)
-    ctx.restore()
-    drawBody(ctx, pose, look, color, color2, sprite)
   }
   ctx.shadowBlur = 0
 

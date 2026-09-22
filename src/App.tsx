@@ -2507,8 +2507,8 @@ export default function App() {
                   </div>
                   {wagerOn ? (
                     <p className="quote">
-                      Lock <b>{stake} cr</b> now · pot {quote.pot} · platform cut {quote.platformCut}{' '}
-                      · winner {quote.winnerPayout} cr · + {BATTLE_ENTRY_FEE} cr entry each at fight
+                      Lock <b>{stake} cr</b> now · not paid back on a win · + {BATTLE_ENTRY_FEE} cr
+                      entry each at fight · credit earning is off
                     </p>
                   ) : (
                     <p className="quote">No wager · entry still {BATTLE_ENTRY_FEE} cr when fight starts</p>

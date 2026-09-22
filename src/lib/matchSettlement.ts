@@ -248,24 +248,16 @@ export function settleMatch(input: SettleMatchInput): SettleMatchResult {
     }
   }
 
-  // ── 1) Credits: battle entry pot (not tournament — entry already on tourney path)
+  // ── 1) Credits: earning is off. Entry stays spent; no pot grant.
   if (lock && mode !== 'tournament') {
-    if (won) {
-      settleBattleWin(lock)
-      payout += lock.winnerPayout
-    } else {
-      settleBattleLose(lock)
-    }
+    if (won) settleBattleWin(lock)
+    else settleBattleLose(lock)
   }
 
-  // ── 2) Credits: optional side wager
+  // ── 2) Optional side wager: lock already spent; wins do not pay credits.
   if (quote) {
-    if (won) {
-      settleWagerWin(quote, lock?.battleId)
-      payout += quote.winnerPayout
-    } else {
-      settleWagerLose(quote)
-    }
+    if (won) settleWagerWin(quote, lock?.battleId)
+    else settleWagerLose(quote)
   }
 
   // ── 3–5) Fighter-bound records + single progress/XP path

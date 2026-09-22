@@ -194,11 +194,11 @@ export function lockBattleEntry(battleId?: string): {
   return { ok: true, lock }
 }
 
-/** Winner pot: own stake back + opponent stake (= 20 for default 10 entry). */
-export function settleBattleWin(lock: BattleEntryLock): void {
-  if (lock.winnerPayout > 0) {
-    mutateCredits(lock.winnerPayout, suiteSpendTag('fighter', 'battle_win'), lock.battleId)
-  }
+/**
+ * Credit earning is off. Entry stays spent; wins do not grant a pot.
+ */
+export function settleBattleWin(_lock: BattleEntryLock): void {
+  /* no grant */
 }
 
 /** Loser: entry already spent at lock. */
@@ -231,10 +231,9 @@ export function lockTournamentEntry(
   return { ok: true, fee }
 }
 
-/** Champion prize payout (earn). */
-export function settleTournamentWin(payout: number, tourneyId: string): void {
-  const n = Math.max(0, Math.floor(Number(payout) || 0))
-  if (n > 0) mutateCredits(n, suiteSpendTag('fighter', 'tourney_prize'), tourneyId)
+/** Credit earning is off — tournament wins do not grant credits. */
+export function settleTournamentWin(_payout: number, _tourneyId: string): void {
+  /* no grant */
 }
 
 /** Credit prices for open mint on Fighter (match World product). */
@@ -291,10 +290,8 @@ export function lockWagerStake(stakeEach: number, ref?: string): {
  * After lock of stake W: credit winnerPayout (1.8W) so net +0.8W vs locked W
  * when opponent side is soft/CPU (same pot math as product lock).
  */
-export function settleWagerWin(quote: WagerQuote, ref?: string): void {
-  if (quote.winnerPayout > 0) {
-    mutateCredits(quote.winnerPayout, suiteSpendTag('fighter', 'wager_win'), ref || 'wager-win')
-  }
+export function settleWagerWin(_quote: WagerQuote, _ref?: string): void {
+  /* Credit earning is off — locked stakes are not paid back as a win. */
 }
 
 /** Loser: stake already spent at lock — no further mutation. */
