@@ -575,10 +575,10 @@ export function MatchSettingsPanel({
         </div>
       </div>
       <p className="hint" style={{ marginTop: 8 }}>
-        Every fight costs <strong>{BATTLE_ENTRY_FEE} cr entry</strong> (winner pot{' '}
-        {BATTLE_ENTRY_FEE * 2} cr). Optional match wager is extra. Tournament entry
-        default {TOURNAMENT_ENTRY_FEE} cr · 80% prize pool to champion. Top up in
-        Wallet if short.
+        Every fight costs <strong>{BATTLE_ENTRY_FEE} cr entry</strong>. Wins do not
+        earn credits. Optional match wager is extra and is not paid back. Tournament
+        entry default {TOURNAMENT_ENTRY_FEE} cr · no credit prize. Top up in Wallet
+        if short.
       </p>
       {pilotControls ? (
         <div className="row" style={{ marginTop: 10 }} data-agent-pilot="1">
@@ -610,10 +610,9 @@ export function MatchSettingsPanel({
         </div>
       </div>
       <p className="quote">
-        Battle entry <b>{BATTLE_ENTRY_FEE} cr</b> · win pot{' '}
-        <b>{BATTLE_ENTRY_FEE * 2} cr</b>
+        Battle entry <b>{BATTLE_ENTRY_FEE} cr</b> · wins do not earn credits
         {wagerOn
-          ? ` · extra wager pot ${quote.pot} · 10% cut ${quote.platformCut} · wager win ${quote.winnerPayout} cr`
+          ? ` · wager lock ${quote.stakeEach} cr is not paid back`
           : ' · optional wager off'}
       </p>
     </section>

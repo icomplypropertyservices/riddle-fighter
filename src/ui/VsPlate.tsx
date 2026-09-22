@@ -27,7 +27,6 @@ function Side({ name, image, side, sub, powerLevel, accent }: SideProps) {
           borderColor: border,
         }}
       >
-        {!image ? <span className="g-vs-empty">?</span> : null}
         {typeof powerLevel === 'number' ? (
           <span className="g-vs-pl">PL {powerLevel}</span>
         ) : null}

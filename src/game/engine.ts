@@ -47,8 +47,12 @@ import {
   drawStageTrue2d,
   type True2dContext,
 } from './render'
-import { preloadAllCharacterBodies } from '../lib/characterBodies'
-import { ensureFramePacksBaked } from './render/frameBake'
+import {
+  bodyUrlFor,
+  getCachedBody,
+  loadCharacterBody,
+  preloadAllCharacterBodies,
+} from '../lib/characterBodies'
 
 export type Side = 'p1' | 'p2'
 
@@ -277,9 +281,8 @@ export class FightEngine {
     }
     if (a.image) void loadNftSprite(a.image)
     if (b.image) void loadNftSprite(b.image)
-    // Character bodies + multi-frame walk/attack packs (Phase 3 sheets)
+    // Painted collection sheets — the real fight graphics
     preloadAllCharacterBodies()
-    void ensureFramePacksBaked()
     void preloadStage(this.stageId)
     void preloadAllStages()
     void preloadKoFx()
@@ -1503,14 +1506,24 @@ function drawStage(
  */
 function drawFighter(ctx: CanvasRenderingContext2D, p: FighterState, frame: number): void {
   // Prefer NFT metadata image as face/identity; fall back gracefully
-  const image =
-    p.fighter.image || p.fighter.originalImage || p.fighter.newImage || undefined
+  const image = p.fighter.image || p.fighter.originalImage || undefined
   const sprite = image ? getCachedSprite(image) : null
   if (image && !sprite) void loadNftSprite(image)
   drawFighterSf(ctx, p, frame, sprite)
 }
 
-/** Arena corner portrait — real NFT art next to HP plate. */
+/** Arena corner portrait — one real plate (NFT media or painted body). Never a letter. */
+function cornerPortraitSource(fighter: Fighter): CanvasImageSource | null {
+  const image = fighter.image || fighter.originalImage || undefined
+  const sprite = image ? getCachedSprite(image) : null
+  if (image && !sprite) void loadNftSprite(image)
+  if (sprite) return sprite
+  const bodyUrl = bodyUrlFor(fighter, 'idle')
+  const body = getCachedBody(bodyUrl)
+  if (!body) void loadCharacterBody(bodyUrl)
+  return body
+}
+
 function drawCornerPortrait(
   ctx: CanvasRenderingContext2D,
   fighter: Fighter,
@@ -1519,13 +1532,9 @@ function drawCornerPortrait(
   left: boolean,
 ): void {
   const size = 52
-  const image =
-    fighter.image || fighter.originalImage || fighter.newImage || undefined
-  const sprite = image ? getCachedSprite(image) : null
-  if (image && !sprite) void loadNftSprite(image)
+  const art = cornerPortraitSource(fighter)
 
   ctx.save()
-  // Solid plate (no gradient)
   ctx.fillStyle = '#0c0c14'
   ctx.strokeStyle = left ? '#22d3ee' : '#f472b6'
   ctx.lineWidth = 2
@@ -1534,7 +1543,7 @@ function drawCornerPortrait(
   ctx.fill()
   ctx.stroke()
 
-  if (sprite) {
+  if (art) {
     ctx.save()
     ctx.beginPath()
     roundRectPath(ctx, x + 2, y + 2, size - 4, size - 4, 6)
@@ -1545,17 +1554,8 @@ function drawCornerPortrait(
     } catch {
       /* soft */
     }
-    ctx.drawImage(sprite, x + 2, y + 2, size - 4, size - 4)
+    ctx.drawImage(art, x + 2, y + 2, size - 4, size - 4)
     ctx.restore()
-  } else {
-    // Solid color fallback from collection palette
-    ctx.fillStyle = fighter.color || '#334155'
-    ctx.fillRect(x + 4, y + 4, size - 8, size - 8)
-    ctx.fillStyle = '#e2e8f0'
-    ctx.font = 'bold 16px system-ui,Segoe UI,sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText((fighter.name || '?').slice(0, 1).toUpperCase(), x + size / 2, y + size / 2)
   }
   ctx.restore()
 }

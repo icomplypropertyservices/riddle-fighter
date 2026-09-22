@@ -9,10 +9,10 @@
 import type { FighterAnimState, JointPose } from './types'
 import { directAnim } from './animDirector'
 import { getCollectionLook, type CollectionLook } from './collectionLooks'
-import { getBakedFrame, ensureFramePacksBaked } from './frameBake'
 import {
   bodyUrlFor,
   clipToBodyPose,
+  getCachedBody,
   loadCharacterBody,
 } from '../../lib/characterBodies'
 
@@ -570,19 +570,29 @@ export function drawFighterArticulated(
   const animState: FighterAnimState = { ...p, walkSpeed }
   const dir = directAnim(animState, frame)
   const pose = dir.pose
-  /** Smooth turn toward opponent — characters visibly flip sides */
-  const f = resolveVisualFacing(p)
+  /**
+   * Painted sheets are full side-view art. Snap facing to ±1 so the real
+   * sprite is never squashed into a paper-thin turn stub.
+   */
+  const f: 1 | -1 = resolveVisualFacing(p) >= 0 ? 1 : -1
   const H = look.height
 
-  // Kick off multi-frame pack bake once (idle lobby / first fight)
-  void ensureFramePacksBaked()
-  void loadCharacterBody(bodyUrlFor(p.fighter, clipToBodyPose(dir.clipId)))
+  // Real collection sheets under /art/characters — not baked procedural packs.
+  const bodyPose = clipToBodyPose(dir.clipId)
+  const bodyUrl = bodyUrlFor(p.fighter, bodyPose)
+  let bodyImg = getCachedBody(bodyUrl)
+  if (!bodyImg) {
+    void loadCharacterBody(bodyUrl)
+    const idleUrl = bodyUrlFor(p.fighter, 'idle')
+    if (idleUrl !== bodyUrl) {
+      bodyImg = getCachedBody(idleUrl)
+      if (!bodyImg) void loadCharacterBody(idleUrl)
+    }
+  }
+  const usePainted = Boolean(bodyImg)
 
-  // Prefer baked multi-frame pack when ready (Phase 3 sprite-sheet path)
-  const baked = getBakedFrame(look.id, dir.clipId, dir.t)
-
-  // Contact shadow (double ring for depth) — stretch slightly with facing
-  const faceAbs = Math.abs(f)
+  // Contact shadow (double ring for depth)
+  const faceAbs = 1
   ctx.save()
   ctx.fillStyle = 'rgba(0,0,0,0.58)'
   ctx.beginPath()
@@ -599,16 +609,9 @@ export function drawFighterArticulated(
     ctx.save()
     ctx.translate(p.x, p.y + 8)
     ctx.globalAlpha = 0.14
-    if (baked) {
-      ctx.scale(f, -0.28)
-      const bh = 200 * look.height
-      const bw = (baked.width / baked.height) * bh
-      ctx.drawImage(baked, -bw / 2, -8, bw, bh)
-    } else {
-      ctx.scale(f * pose.scaleX * look.height * 0.92, -pose.scaleY * look.height * 0.35)
-      ctx.filter = 'blur(0.5px)'
-      drawBody(ctx, pose, look, color, color2, null)
-      ctx.filter = 'none'
+    if (usePainted && bodyImg) {
+      ctx.scale(1, -0.32)
+      drawPaintedBody(ctx, bodyImg, pose, look, f, null)
     }
     ctx.restore()
   }
@@ -639,14 +642,8 @@ export function drawFighterArticulated(
       ctx.save()
       ctx.globalAlpha = 0.12 * i
       ctx.translate(p.x - f * i * 16, p.y + pose.rootY)
-      if (baked) {
-        ctx.scale(f, 1)
-        const bh = 210 * look.height
-        const bw = (baked.width / baked.height) * bh
-        ctx.drawImage(baked, -bw / 2, -bh + 8, bw, bh)
-      } else {
-        ctx.scale(f * pose.scaleX * look.height, pose.scaleY * look.height)
-        drawBody(ctx, pose, look, color, color2, null)
+      if (usePainted && bodyImg) {
+        drawPaintedBody(ctx, bodyImg, pose, look, f, null)
       }
       ctx.restore()
     }
@@ -666,63 +663,21 @@ export function drawFighterArticulated(
     ctx.shadowBlur = 16
   }
 
-  if (baked) {
-    // Multi-frame pack playback — feet at origin
-    ctx.scale(f, 1)
-    if (dir.clipId === 'walk') ctx.translate(0, Math.sin(frame * 0.65) * 2)
-    if (p.dead) {
-      ctx.rotate(0.2)
-      ctx.translate(0, 16)
-    }
-    const bh = 220 * look.height * pose.scaleY
-    const bw = (baked.width / baked.height) * bh * pose.scaleX * look.bulk
-    ctx.imageSmoothingEnabled = true
-    try {
-      ctx.imageSmoothingQuality = 'high'
-    } catch {
-      /* ignore */
-    }
-    ctx.drawImage(baked, -bw / 2, -bh + 6, bw, bh)
-    // NFT face inset on baked frame
-    if (sprite) {
-      const faceSize = 38 * look.faceScale * look.height
-      const fx = -faceSize * 0.05
-      const fy = -bh * 0.7
-      ctx.save()
-      ctx.beginPath()
-      ctx.ellipse(
-        fx + faceSize * 0.35,
-        fy + faceSize * 0.42,
-        faceSize * 0.4,
-        faceSize * 0.46,
-        0,
-        0,
-        Math.PI * 2,
-      )
-      ctx.clip()
-      ctx.globalAlpha = 0.94
-      ctx.drawImage(sprite, fx, fy, faceSize * 0.9, faceSize * 1.05)
-      ctx.restore()
-    }
-  } else {
-    // Live articulated fallback while packs bake
-    ctx.scale(f * pose.scaleX * look.height, pose.scaleY * look.height)
-    if (dir.clipId === 'walk') {
-      ctx.translate(0, Math.sin(frame * 0.65) * 2.4)
-    } else if (dir.clipId === 'idle') {
-      ctx.translate(0, Math.sin(frame / 12) * 1.3)
-    }
-    if (p.dead) {
-      ctx.rotate(0.22)
-      ctx.translate(0, 18)
-    }
+  if (usePainted && bodyImg) {
+    const crouchBoost = p.crouch ? 0.88 : 1
+    const koTilt = p.dead ? 0.92 : 1
     ctx.save()
-    ctx.globalAlpha = 0.32
-    ctx.shadowColor = look.outline || '#000'
-    ctx.shadowBlur = 12
-    drawBody(ctx, pose, look, shade(color, -60), shade(color2, -50), null)
+    ctx.scale(pose.scaleX * crouchBoost, pose.scaleY * crouchBoost * koTilt)
+    const bob =
+      dir.clipId === 'walk'
+        ? Math.sin(frame / 4) * 2
+        : dir.clipId === 'idle'
+          ? Math.sin(frame / 14) * 1.2
+          : 0
+    ctx.translate(0, bob + (p.crouch ? 18 : 0) + (p.dead ? 24 : 0))
+    if (p.dead) ctx.rotate(f * 0.35)
+    drawPaintedBody(ctx, bodyImg, pose, look, f, sprite)
     ctx.restore()
-    drawBody(ctx, pose, look, color, color2, sprite)
   }
   ctx.shadowBlur = 0
 

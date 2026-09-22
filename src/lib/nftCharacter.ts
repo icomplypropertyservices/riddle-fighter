@@ -404,12 +404,13 @@ export function fighterFromNft(input: NftCharacterInput): Fighter {
   const nftWins = numFromTrait(firstTrait(tm, ['wins', 'rf wins', 'record wins']), NaN)
   const nftLosses = numFromTrait(firstTrait(tm, ['losses', 'rf losses', 'record losses']), NaN)
 
+  const plate = slots.image || slots.originalImage || undefined
   const built: Fighter = {
     id: `nft-${id}`,
     name: displayName,
-    image: slots.image || undefined,
-    originalImage: slots.originalImage || undefined,
-    newImage: slots.newImage,
+    image: plate,
+    originalImage: plate,
+    newImage: undefined,
     color,
     color2,
     stats: baseStats,

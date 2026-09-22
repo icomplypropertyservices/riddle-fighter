@@ -396,12 +396,7 @@ export default function App() {
       nftId: nid,
       name: f.name,
       image: f.image,
-      // Keep genesis distinct from evolved — never copy image into both slots
-      originalImage: f.originalImage || f.image,
-      newImage:
-        f.newImage && f.newImage !== (f.originalImage || f.image)
-          ? f.newImage
-          : undefined,
+      originalImage: f.image,
       collection: f.collection,
       categoryLabel: f.categoryLabel,
       taxon: f.taxon,
@@ -450,9 +445,7 @@ export default function App() {
           },
         })
         setNftFighters(list)
-        preloadFighterImages(
-          list.flatMap((f) => [f.image, f.originalImage, f.newImage].filter(Boolean) as string[]),
-        )
+        preloadFighterImages(list.map((f) => f.image).filter(Boolean) as string[])
         for (const f of list) {
           const nid = f.nftId || f.id.replace(/^nft-/, '')
           if (!nid) continue
@@ -460,11 +453,7 @@ export default function App() {
             nftId: nid,
             name: f.name,
             image: f.image,
-            originalImage: f.originalImage || f.image,
-            newImage:
-              f.newImage && f.newImage !== (f.originalImage || f.image)
-                ? f.newImage
-                : undefined,
+            originalImage: f.image,
             collection: f.collection,
             categoryLabel: f.categoryLabel,
             taxon: f.taxon,
@@ -2518,8 +2507,8 @@ export default function App() {
                   </div>
                   {wagerOn ? (
                     <p className="quote">
-                      Lock <b>{stake} cr</b> now · pot {quote.pot} · platform cut {quote.platformCut}{' '}
-                      · winner {quote.winnerPayout} cr · + {BATTLE_ENTRY_FEE} cr entry each at fight
+                      Lock <b>{stake} cr</b> now · not paid back on a win · + {BATTLE_ENTRY_FEE} cr
+                      entry each at fight · credit earning is off
                     </p>
                   ) : (
                     <p className="quote">No wager · entry still {BATTLE_ENTRY_FEE} cr when fight starts</p>

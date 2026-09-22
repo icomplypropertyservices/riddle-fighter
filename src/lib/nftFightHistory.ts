@@ -1,6 +1,6 @@
 /**
  * Per-NFT fight history + public card cache (local, suite-scoped).
- * Public pages can open ?view=<nftId> and show OLD|NEW + record without re-connect.
+ * Public pages can open ?view=<nftId> and show the fighter plate + record without re-connect.
  */
 
 const HIST_KEY = 'rf_nft_fight_hist_v1'

@@ -13,8 +13,8 @@ import {
 } from '../lib/nftCatalog'
 import { filterByCategory } from '../lib/nfts'
 import { sfx } from '../lib/audio'
-import { BASIC_HUMAN_PINATA_IMAGE, resolveFighterArt } from '../lib/nftArt'
-import { basicHumanSvgDataUri } from '../lib/starterHuman'
+import { fighterDisplayImage } from '../lib/nftArt'
+import { bodyUrlFor } from '../lib/characterBodies'
 import {
   computePowerLevel,
   powerLevelOf,
@@ -49,57 +49,44 @@ function isFightable(f: Fighter): boolean {
 }
 
 function artFor(f: Fighter): string {
-  return (
-    resolveFighterArt({
-      name: f.name,
-      image: f.image,
-      originalImage: f.originalImage,
-      newImage: f.newImage,
-      taxon: f.taxon,
-      collection: f.collection,
-      traits: f.traits,
-      uri: (f as { uri?: string }).uri,
-    }) || ''
-  )
+  return fighterDisplayImage({
+    name: f.name,
+    image: f.image,
+    originalImage: f.originalImage,
+    newImage: f.newImage,
+    taxon: f.taxon,
+    collection: f.collection,
+    category: f.category,
+    id: f.id,
+    nftId: f.nftId,
+    traits: f.traits,
+    uri: (f as { uri?: string }).uri,
+  })
 }
 
 function ThumbImg({ f, img }: { f: Fighter; img: string }) {
+  const body = bodyUrlFor(
+    {
+      id: f.id,
+      nftId: f.nftId,
+      category: f.category,
+      collection: f.collection,
+      taxon: f.taxon,
+    },
+    'idle',
+  )
   return (
     <img
-      src={
-        img ||
-        resolveFighterArt({
-          name: f.name || 'Human',
-          taxon: f.taxon ?? 9001,
-          collection: f.collection || 'Riddle Basic Human',
-          traits: f.traits,
-        })
-      }
+      src={img || body}
       alt=""
       loading="lazy"
       decoding="async"
       className="fp-thumb-img"
       onError={(e) => {
         const el = e.currentTarget
-        const serial = Number(
-          f.traits?.find((t) => /serial/i.test(String(t.trait_type)))?.value ||
-            String(f.name || '').match(/#\s*0*(\d+)/)?.[1] ||
-            1,
-        )
-        const step = String(el.dataset.step || '')
-        if (step === '' && !String(el.src || '').includes('pinata.cloud')) {
-          el.dataset.step = 'pinata'
-          el.src = BASIC_HUMAN_PINATA_IMAGE
-          return
-        }
-        if (step === '' || step === 'pinata' || step === 'svg') {
-          // Misnamed helper — returns PNG body plate, not SVG
-          el.dataset.step = 'body'
-          el.src = basicHumanSvgDataUri({
-            serial,
-            label: `Human #${serial}`,
-          })
-        }
+        if (el.dataset.step === 'body') return
+        el.dataset.step = 'body'
+        if (el.src !== body && !el.src.endsWith(body)) el.src = body
       }}
     />
   )
