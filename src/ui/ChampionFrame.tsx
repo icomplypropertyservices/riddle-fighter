@@ -46,15 +46,7 @@ export function ChampionFrame({
       ) : null}
       {image ? (
         <img className="med-champion-art" src={image} alt="" loading="lazy" />
-      ) : (
-        <div
-          className="med-champion-art"
-          style={{ display: 'grid', placeItems: 'center', color: 'var(--med-mute)' }}
-          aria-hidden
-        >
-          ?
-        </div>
-      )}
+      ) : null}
       <h3 className="med-champion-name">{name}</h3>
       {sub || typeof powerLevel === 'number' ? (
         <p className="med-champion-sub">

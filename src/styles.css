@@ -1559,50 +1559,7 @@ body.fight-immersive .fight-control-legend {
   }
 }
 
-/* �� NFT dual swatch + view (OLD|NEW) �� */
-.fighter-card-wrap {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.fighter-card-wrap.selected .fighter-card {
-  border-color: var(--riddle-violet);
-  outline: 1px solid var(--riddle-violet);
-}
-
-.fighter-card-wrap.dim {
-  opacity: 0.55;
-}
-
-.nft-swatch-dual {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  margin-bottom: 8px;
-}
-
-.nft-swatch-dual .swatch {
-  margin-bottom: 0;
-  height: 48px;
-}
-
-.nft-swatch-dual:has(.swatch:only-child),
-.nft-swatch-dual .swatch:only-child {
-  grid-column: 1 / -1;
-}
-
-.nft-swatch-new {
-  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.55);
-}
-
-.fighter-view-btn {
-  width: 100%;
-  min-height: 36px;
-}
-
-/* �� Xaman SignIn QR on-page modal (no extra xumm.app tab) �� */
+/* ── Xaman SignIn QR on-page modal (no extra xumm.app tab) ── */
 .xaman-qr-overlay {
   position: fixed;
   inset: 0;
@@ -1626,7 +1583,7 @@ body.fight-immersive .fight-control-legend {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
 }
 
-/* �� Full NFT detail modal (public OLD|NEW + history) �� */
+/* ── Full NFT detail modal (single plate + history) ── */
 .nft-detail-overlay {
   position: fixed;
   inset: 0;
@@ -1831,7 +1788,7 @@ body.fight-immersive .fight-control-legend {
 
 
 /* -----------------------------------------------------------
-   NFT DETAIL v3 � compact dual art (nd-*)
+   NFT DETAIL — one champion plate
    ----------------------------------------------------------- */
 .nd-overlay {
   position: fixed;
@@ -1892,68 +1849,6 @@ body.fight-immersive .fight-control-legend {
   word-break: break-all;
   color: #8b8ba3;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-.nd-dual {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  max-width: 100%;
-}
-.nd-art-slot {
-  position: relative;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid #1f1f2e;
-  background: #0a0a10;
-  /* Fit screen � never tall full-bleed portraits */
-  aspect-ratio: 1;
-  max-height: 140px;
-}
-.nd-art-slot.is-new {
-  border-color: rgba(139, 92, 246, 0.55);
-}
-.nd-art-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  object-fit: cover;
-  object-position: center top;
-  display: block;
-}
-.nd-art-tag {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 2;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: rgba(7, 7, 12, 0.88);
-  border: 1px solid #1f1f2e;
-  color: #e2e8f0;
-}
-.nd-art-slot.is-new .nd-art-tag {
-  background: rgba(139, 92, 246, 0.9);
-  border-color: #d4a017;
-}
-.nd-art-ph {
-  width: 100%;
-  height: 100%;
-  min-height: 100px;
-  display: grid;
-  place-items: center;
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 700;
-}
-.nd-cap {
-  margin: 6px 0 0;
-  font-size: 11px;
-  color: #8b8ba3;
 }
 .nd-chips {
   display: flex;

@@ -96,7 +96,6 @@ export type SettleMatchFighter = Pick<
   | 'nftId'
   | 'image'
   | 'originalImage'
-  | 'newImage'
   | 'collection'
   | 'category'
   | 'categoryLabel'
@@ -317,12 +316,7 @@ export function settleMatch(input: SettleMatchInput): SettleMatchResult {
           nftId: nid,
           name: selected.name,
           image: selected.image,
-          originalImage: selected.originalImage || selected.image,
-          newImage:
-            selected.newImage &&
-            selected.newImage !== (selected.originalImage || selected.image)
-              ? selected.newImage
-              : undefined,
+          originalImage: selected.image,
           collection: selected.collection,
           categoryLabel: selected.categoryLabel,
           taxon: selected.taxon,

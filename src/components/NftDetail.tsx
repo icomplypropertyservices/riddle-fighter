@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Fighter } from '../lib/fighters'
 import { CATEGORY_LABEL } from '../lib/nftCatalog'
-import { artUrlsEqual, splitArtSlots } from '../lib/nftArt'
+import { fighterDisplayImage } from '../lib/nftArt'
 import {
   loadNftFightHistory,
   publicNftViewUrl,
@@ -30,39 +30,6 @@ type Props = {
   onShare?: (url: string) => void
 }
 
-function ArtSlot({
-  url,
-  label,
-  pending,
-}: {
-  url?: string
-  label: 'OLD' | 'NEW'
-  pending?: boolean
-}) {
-  return (
-    <div className={`nd-art-slot${label === 'NEW' ? ' is-new' : ''}`}>
-      <span className="nd-art-tag">{label}</span>
-      {url && !pending ? (
-        <img
-          src={url}
-          alt={label}
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          className="nd-art-img"
-          onError={(e) => {
-            const el = e.currentTarget
-            el.style.display = 'none'
-            el.removeAttribute('src')
-          }}
-        />
-      ) : (
-        <div className="nd-art-ph">{pending || !url ? 'Soon' : '—'}</div>
-      )}
-    </div>
-  )
-}
-
 export function NftDetail({
   fighter,
   publicCard,
@@ -75,21 +42,18 @@ export function NftDetail({
   const name = fighter?.name || publicCard?.name || 'NFT'
   const nftId =
     fighter?.nftId || fighter?.id?.replace(/^nft-/, '') || publicCard?.nftId || ''
-  const artSlots = splitArtSlots({
+  const heroImg = fighterDisplayImage({
     name,
     image: fighter?.image || publicCard?.image,
     originalImage: fighter?.originalImage || publicCard?.originalImage,
     newImage: fighter?.newImage || publicCard?.newImage,
     taxon: fighter?.taxon ?? publicCard?.taxon,
     collection: fighter?.collection || publicCard?.collection,
+    category: fighter?.category,
+    id: fighter?.id,
+    nftId: nftId || undefined,
     traits: fighter?.traits,
   })
-  const displayOld = artSlots.originalImage || fighter?.image || publicCard?.image
-  const newUrl =
-    artSlots.newImage && !artUrlsEqual(artSlots.newImage, displayOld)
-      ? artSlots.newImage
-      : undefined
-  const hasNew = Boolean(newUrl)
   const collection = fighter?.collection || publicCard?.collection
   const category =
     fighter?.categoryLabel ||
@@ -150,7 +114,6 @@ export function NftDetail({
     return publicNftViewUrl(nftId)
   }, [nftId])
 
-  const heroImg = newUrl || displayOld
   const xpCost = 100
   const canUpgrade = progress.xp >= xpCost
 
@@ -197,16 +160,6 @@ export function NftDetail({
             }
           />
         ) : null}
-
-        <div className="nd-dual" data-dual="1">
-          <ArtSlot url={displayOld} label="OLD" />
-          <ArtSlot url={hasNew ? newUrl : undefined} label="NEW" pending={!hasNew} />
-        </div>
-        <p className="nd-cap">
-          {hasNew
-            ? 'OLD = genesis · NEW = evolved art'
-            : 'OLD = current art · NEW after evolve'}
-        </p>
 
         <div className="nd-chips">
           {category ? <span className="chip">{category}</span> : null}

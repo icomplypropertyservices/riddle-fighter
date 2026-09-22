@@ -10,8 +10,8 @@
 import {
   BASIC_HUMAN_PINATA_IMAGE,
   basicHumanImageUrl,
-  basicHumanSvgDataUri,
 } from './starterHuman'
+import { bodyUrlFor } from './characterBodies'
 import type { Fighter } from './fighters'
 
 export const CITY_CDN = 'https://city.riddlewallet.com'
@@ -192,13 +192,36 @@ function isWeakBasicHumanArt(s: string): boolean {
   return false
 }
 
-/** Any NFT art URL we refuse to paint (SVG, meta JSON). */
+/** Any NFT art URL we refuse to paint (SVG, meta JSON, generated data-URI stubs). */
 function isUnusableArt(s: string): boolean {
   const u = String(s || '').trim()
   if (!u) return true
   if (isMetaJsonPath(u)) return true
   if (isSvgArtUrl(u)) return true
+  if (/^data:/i.test(u)) return true
+  if (/placeholder|letter-?avatar|soon\b/i.test(u)) return true
   return false
+}
+
+/** Painted side-view sheet for this fighter's collection (real /art/characters PNG). */
+function collectionBodyPlate(opts: {
+  name?: string
+  taxon?: number | null
+  collection?: string | null
+  category?: string | null
+  id?: string | null
+  nftId?: string | null
+}): string {
+  return bodyUrlFor(
+    {
+      id: opts.id || opts.name,
+      nftId: opts.nftId || undefined,
+      category: opts.category || undefined,
+      collection: opts.collection || undefined,
+      taxon: opts.taxon,
+    },
+    'idle',
+  )
 }
 
 function normalizeIpfs(s: string): string {
@@ -442,31 +465,63 @@ export function resolveFighterArt(opts: {
     return COLLECTION_COVER_JPG[slugHint]
   }
 
-  // basicHumanSvgDataUri is misnamed — returns PNG body art, not SVG
-  return candidates[0] || basicHumanSvgDataUri({ serial: 1, label: 'Fighter' })
+  return (
+    candidates[0] ||
+    collectionBodyPlate({
+      name: opts.name,
+      taxon: opts.taxon,
+      collection: opts.collection,
+    })
+  )
 }
 
 /**
- * Guarantee fighter image fields for UI.
- * Preserves genesis (OLD) vs evolved (NEW) — never collapses both onto one URL.
+ * One real plate per fighter.
+ * Prefers on-chain / CDN / blob art, then the painted collection sheet.
+ * Never a letter avatar, SVG badge, or a second OLD|NEW slot.
+ */
+export function fighterDisplayImage(opts: {
+  name?: string
+  image?: string | null
+  originalImage?: string | null
+  newImage?: string | null
+  taxon?: number | null
+  collection?: string | null
+  category?: string | null
+  id?: string | null
+  nftId?: string | null
+  traits?: Array<{ trait_type?: string; value?: unknown }> | null
+  uri?: string | null
+}): string {
+  const resolved = resolveFighterArt(opts)
+  if (resolved && !isUnusableArt(resolved) && !isSvgArtUrl(resolved)) return resolved
+  return collectionBodyPlate(opts)
+}
+
+/**
+ * Guarantee one real image on the fighter.
+ * Evolved CDN/IPFS art wins when it is a distinct real plate; the second
+ * OLD|NEW slot is not kept (broken dual images are not shown).
  */
 export function ensureFighterArt(f: Fighter): Fighter {
   if (!f) return f
-  const slots = splitArtSlots({
+  const image = fighterDisplayImage({
     name: f.name,
     image: f.image,
     originalImage: f.originalImage,
     newImage: f.newImage,
     taxon: f.taxon,
     collection: f.collection,
+    category: f.category,
+    id: f.id,
+    nftId: f.nftId,
     traits: f.traits,
     uri: (f as { uri?: string }).uri,
   })
   return {
     ...f,
-    image: slots.image || f.image,
-    originalImage: slots.originalImage || f.originalImage || slots.image,
-    // Only keep NEW when splitArtSlots found a distinct evolved plate
-    newImage: slots.newImage,
+    image,
+    originalImage: image,
+    newImage: undefined,
   }
 }

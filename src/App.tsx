@@ -396,12 +396,7 @@ export default function App() {
       nftId: nid,
       name: f.name,
       image: f.image,
-      // Keep genesis distinct from evolved — never copy image into both slots
-      originalImage: f.originalImage || f.image,
-      newImage:
-        f.newImage && f.newImage !== (f.originalImage || f.image)
-          ? f.newImage
-          : undefined,
+      originalImage: f.image,
       collection: f.collection,
       categoryLabel: f.categoryLabel,
       taxon: f.taxon,
@@ -450,9 +445,7 @@ export default function App() {
           },
         })
         setNftFighters(list)
-        preloadFighterImages(
-          list.flatMap((f) => [f.image, f.originalImage, f.newImage].filter(Boolean) as string[]),
-        )
+        preloadFighterImages(list.map((f) => f.image).filter(Boolean) as string[])
         for (const f of list) {
           const nid = f.nftId || f.id.replace(/^nft-/, '')
           if (!nid) continue
@@ -460,11 +453,7 @@ export default function App() {
             nftId: nid,
             name: f.name,
             image: f.image,
-            originalImage: f.originalImage || f.image,
-            newImage:
-              f.newImage && f.newImage !== (f.originalImage || f.image)
-                ? f.newImage
-                : undefined,
+            originalImage: f.image,
             collection: f.collection,
             categoryLabel: f.categoryLabel,
             taxon: f.taxon,

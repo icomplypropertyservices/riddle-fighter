@@ -2,7 +2,7 @@
  * Versus strip — portraits + raised FIGHT plate (SF VS energy).
  */
 import type { Fighter } from '../../lib/fighters'
-import { resolveFighterArt } from '../../lib/nftArt'
+import { fighterDisplayImage } from '../../lib/nftArt'
 import { powerLevelOf, withCombatPowers } from '../../lib/traitPowers'
 import { BATTLE_ENTRY_FEE, TOURNAMENT_ENTRY_FEE, formatCredits } from '../../lib/credits'
 
@@ -22,13 +22,16 @@ type Props = {
 function Portrait({ f, side }: { f: Fighter | null; side: 'p1' | 'p2' }) {
   const powered = f ? (f.powers && f.powerLevel ? f : withCombatPowers(f)) : null
   const img = powered
-    ? resolveFighterArt({
+    ? fighterDisplayImage({
         name: powered.name,
         image: powered.image,
         originalImage: powered.originalImage,
         newImage: powered.newImage,
         taxon: powered.taxon,
         collection: powered.collection,
+        category: powered.category,
+        id: powered.id,
+        nftId: powered.nftId,
         traits: powered.traits,
       })
     : ''
@@ -52,7 +55,6 @@ function Portrait({ f, side }: { f: Fighter | null; side: 'p1' | 'p2' }) {
             : { backgroundColor: '#1a140e', borderColor: accent }
         }
       >
-        {!img ? <span className="g-vs-empty">?</span> : null}
         {powered ? <span className="g-vs-pl">PL {pl}</span> : null}
       </div>
       <div className="g-vs-meta">

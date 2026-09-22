@@ -9,6 +9,7 @@ import './game-ui.css'
 import './fighter-dash.css'
 import './tournament-board.css'
 import { preloadAllStages, preloadKoFx } from './lib/stageAssets'
+import { preloadAllCharacterBodies } from './lib/characterBodies'
 import { ensureFramePacksBaked, compositeWalkStrip } from './game/render/frameBake'
 
 const root = document.getElementById('root')
@@ -17,8 +18,7 @@ if (!root) throw new Error('#root missing')
 // Suite bottom nav clearance: body flag + .has-suite-chrome on shell
 document.body.classList.add('has-suite-chrome')
 
-// Warm multi-frame walk/attack packs + expose artist preview hook
-void ensureFramePacksBaked()
+// Artist preview hook only — the fight draws painted /art/characters sheets, not baked stubs.
 if (typeof window !== 'undefined') {
   ;(
     window as unknown as {
@@ -30,7 +30,8 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Warm painted arena art ASAP for first fight
+// Warm painted character sheets + arena art ASAP for first fight
+preloadAllCharacterBodies()
 preloadAllStages()
 void preloadKoFx()
 

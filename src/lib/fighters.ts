@@ -13,7 +13,6 @@ export type FighterStats = {
 
 import type { NftCategory } from './nftCatalog'
 import { buildMoveset, type FighterMoveset } from './moveset'
-import { generateFighterPortrait } from './portraitGen'
 import { bodyUrlFor } from './characterBodies'
 import type { CombatPowers } from './traitPowers'
 import { withCombatPowers } from './traitPowers'
@@ -296,14 +295,11 @@ function withMoves(seed: DemoSeed): Fighter {
       : undefined,
   })
   const wl = loadWl(seed.id)
-  // Prefer actual character body art for picker + identity; canvas portrait as fallback
+  // Painted collection sheet — never a generated canvas stub
   let image = rest.image
   try {
     if (!image) {
       image = bodyUrlFor({ id: seed.id, category: seed.category }, 'idle')
-    }
-    if (!image) {
-      image = generateFighterPortrait(seed.id, seed.color, seed.color2, seed.name)
     }
   } catch {
     /* soft — keep color fallback */
@@ -353,9 +349,6 @@ function cpuTemplates(): Fighter[] {
     fightable: true,
     collection: undefined,
     categoryLabel: 'CPU',
-    image: undefined,
-    originalImage: undefined,
-    newImage: undefined,
   }))
 }
 
@@ -413,15 +406,10 @@ export function cpuFromOwned(
       speed: Math.max(5, Math.round(s.speed * mult)),
       special: Math.max(10, Math.round(s.special * mult)),
     },
-    // Keep real NFT art so fight uses their assets, not fake demos
-    // Preserve OLD (genesis) vs NEW (evolved) — do not collapse slots
-    image: owned.image || owned.newImage || owned.originalImage,
-    originalImage: owned.originalImage || owned.image,
-    newImage:
-      owned.newImage &&
-      owned.newImage !== (owned.originalImage || owned.image)
-        ? owned.newImage
-        : undefined,
+    // One real plate — owned NFT art, else the painted collection sheet
+    image: owned.image || owned.originalImage,
+    originalImage: owned.image || owned.originalImage,
+    newImage: undefined,
   }
 }
 
@@ -488,9 +476,12 @@ export function fighterFromHandle(handle: string): Fighter {
     secretName: base.secretName,
     superName: base.superName,
   })
+  const plate = bodyUrlFor({ id: `handle-${h}`, category: 'human' }, 'idle')
   return {
     id: `handle-${h}`,
     name: `@${h}`,
+    image: plate,
+    originalImage: plate,
     color,
     color2,
     stats: {
